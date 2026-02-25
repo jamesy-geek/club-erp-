@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Transactions</title>
+</head>
+<body>
+
+<link rel="stylesheet" href="/style.css">
+
+<div class="menu-toggle" onclick="toggleMenu()">
+  ☰ Menu
+</div>
+
+<div class="layout">
+
+  <div class="sidebar" id="sidebar">
+   <h2>Club ERP</h2>
+
+   <a href="/">Dashboard</a>
+   <a href="/components-page">Components</a>
+   <a href="/issue-page">Issue</a>
+   <a href="/transactions-page">Transactions</a>
+   <a href="/student.html">Student Profile</a>
+
+   <hr>
+
+   <a href="/admin-settings.html">Admin Settings</a>
+   <a href="#" onclick="logout()">Logout</a>
+</div>
+
+  <div class="content">
+    <h1>Transactions</h1>
+
+  <div id="container"></div>
+
+</div>
+
+<script>
+
+let currentFilter = "all";
+
+function setFilter(type) {
+  currentFilter = type;
+  load();
+}
+
+async function load() {
+  const res = await fetch("/transactions");
+  const data = await res.json();
+
+  const container = document.getElementById("container");
+  container.innerHTML = "";
+
+  const grouped = {};
+
+  data.forEach(row => {
+    if (!grouped[row.issue_id]) {
+      grouped[row.issue_id] = {
+        student_name: row.student_name,
+        usn: row.usn,
+        phone: row.phone,
+        issue_timestamp: row.issue_timestamp,
+        items: []
+      };
+    }
+    grouped[row.issue_id].items.push(row);
+  });
+
+  Object.keys(grouped).forEach(issue_id => {
+
+    const issue = grouped[issue_id];
+    const localTime = new Date(issue.issue_timestamp).toLocaleString();
+
+    const hasActive = issue.items.some(i => i.remaining > 0);
+
+    // FILTER LOGIC
+    if (currentFilter === "active" && !hasActive) return;
+    if (currentFilter === "completed" && hasActive) return;
+
+    let html = `
+      <div style="border:1px solid black; padding:15px; margin-bottom:20px;
+                  ${!hasActive ? "background:#f0f0f0;" : ""}">
+        <strong>Student:</strong> ${issue.student_name} (${issue.usn})<br>
+        <strong>Phone:</strong> ${issue.phone}<br>
+        <strong>Time:</strong> ${localTime}<br><br>
+    `;
+
+    const statusBadge = hasActive
+      ? '<span style="background:#f59e0b;color:white;padding:4px 8px;border-radius:6px;font-size:12px;">ACTIVE</span>'
+      : '<span style="background:#16a34a;color:white;padding:4px 8px;border-radius:6px;font-size:12px;">COMPLETED</span>';
+
+   html += statusBadge + "<br><br>";
+
+    if (hasActive) {
+      html += `
+        <button onclick="returnAll(${issue_id})">
+          Return All
+        </button>
+      `;
+    } else {
+      html += `
+        <span style="color:green; font-weight:bold;">
+          ✔ Fully Completed
+        </span>
+      `;
+    }
+
+    html += "<ul>";
+
+    issue.items.forEach(item => {
+
+      html += `
+        <li style="margin-top:10px;">
+          <strong>${item.component_name}</strong><br>
+          Issued: ${item.quantity} |
+          Returned: ${item.returned_quantity} |
+          Remaining: ${item.remaining}
+          <br>
+      `;
+
+      if (item.remaining > 0) {
+
+        html += `
+          <input 
+            type="number" 
+            id="return-${item.item_id}" 
+            placeholder="Qty"
+            min="1"
+            max="${item.remaining}"
+          >
+          <button onclick="returnItem(${item.item_id}, ${item.component_id})">
+            Return
+          </button>
+        `;
+
+      } else {
+
+        html += `
+          <span style="color:green;">
+            ✔ Returned
+          </span>
+        `;
+      }
+
+      html += "</li>";
+    });
+
+    html += "</ul></div>";
+
+    container.innerHTML += html;
+  });
+}
+
+
+// ================= INDIVIDUAL RETURN =================
+
+async function returnItem(item_id, component_id) {
+
+  const input = document.getElementById(`return-${item_id}`);
+  const qty = parseInt(input.value);
+
+  if (!qty || qty <= 0) {
+    showToast("Enter valid return quantity", false);
+    return;
+  }
+
+  if (!confirm("Confirm return?")) return;
+
+  await fetch("/return-item", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      item_id,
+      return_quantity: qty,
+      component_id
+    })
+  });
+
+  showToast("Item returned");
+  load();
+}
+
+
+// ================= RETURN ALL =================
+
+async function returnAll(issue_id) {
+
+  if (!confirm("Return ALL items for this transaction?")) return;
+
+  await fetch("/return-all", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ issue_id })
+  });
+
+  showToast("All items returned");
+  load();
+}
+
+load();
+
+</script>
+
+<script>
+function toggleMenu() {
+  document.getElementById("sidebar").classList.toggle("active");
+}
+</script>
+
+<div id="toast" style="
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: #1e293b;
+  color: white;
+  padding: 12px 18px;
+  border-radius: 8px;
+  display: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+"></div>
+
+<script>
+function showToast(message, success = true) {
+  const toast = document.getElementById("toast");
+  toast.style.background = success ? "#16a34a" : "#dc2626";
+  toast.innerText = message;
+  toast.style.display = "block";
+
+  setTimeout(() => {
+    toast.style.display = "none";
+  }, 2500);
+}
+</script>
+
+<script>
+async function logout() {
+  await fetch("/logout", { method: "POST" });
+  window.location.href = "/login.html";
+}
+</script>
+
+</body>
+</html>

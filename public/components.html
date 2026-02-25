@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Manage Components</title>
+</head>
+<body>
+
+<link rel="stylesheet" href="/style.css">
+
+<div class="menu-toggle" onclick="toggleMenu()">
+  ☰ Menu
+</div>
+
+<div class="layout">
+
+  <div class="sidebar" id="sidebar">
+   <h2>Club ERP</h2>
+
+   <a href="/">Dashboard</a>
+   <a href="/components-page">Components</a>
+   <a href="/issue-page">Issue</a>
+   <a href="/transactions-page">Transactions</a>
+   <a href="/student.html">Student Profile</a>
+
+   <hr>
+
+   <a href="/admin-settings.html">Admin Settings</a>
+   <a href="#" onclick="logout()">Logout</a>
+ </div>
+
+  <div class="content">
+    <h1>Components</h1>
+
+      <div class="card">
+        <input type="file" id="photo1">
+     <input type="file" id="photo2">
+     <input id="name" placeholder="Component Name">
+     <input id="qty" type="number" placeholder="Quantity">
+     <button onclick="addComponent()">Add</button>
+     </div>
+
+     <div id="list"></div>
+
+<script>
+
+// Convert file to base64
+function toBase64(file) {
+  return new Promise((resolve) => {
+    if (!file) return resolve(null);
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.readAsDataURL(file);
+  });
+}
+
+async function addComponent() {
+
+  const name = document.getElementById("name").value.trim();
+  const quantity = parseInt(document.getElementById("qty").value);
+
+  const file1 = document.getElementById("photo1").files[0];
+  const file2 = document.getElementById("photo2").files[0];
+
+  const photo1 = await toBase64(file1);
+  const photo2 = await toBase64(file2);
+
+  if (!name || !quantity) {
+    alert("Enter name and quantity");
+    return;
+  }
+
+  await fetch("/add-component", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name,
+      quantity,
+      photo1,
+      photo2
+    })
+  });
+
+  load();
+}
+
+async function editComponent(id) {
+
+  const res = await fetch("/components");
+  const data = await res.json();
+  const component = data.find(c => c.id === id);
+
+  if (!component) return;
+
+  const newName = prompt("Edit Name:", component.name);
+  if (newName === null) return;
+
+  const newQty = prompt("Edit Total Quantity:", component.total_quantity);
+  if (newQty === null) return;
+
+  const action = prompt("Type 'delete' to delete this component, or press OK to save changes");
+
+  if (action && action.toLowerCase() === "delete") {
+
+    if (!confirm("Are you sure you want to permanently delete this component?")) return;
+
+    const deleteRes = await fetch("/delete-component", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id })
+    });
+
+    const deleteData = await deleteRes.json();
+    showToast(deleteData.message, deleteData.message.includes("success"));
+    load();
+    return;
+  }
+
+  await fetch("/edit-component", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      id,
+      new_total_quantity: parseInt(newQty)
+    })
+  });
+
+  // Update name separately
+  await fetch("/rename-component", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      id,
+      new_name: newName
+    })
+  });
+
+  showToast("Component updated");
+  load();
+}
+
+async function load() {
+
+  const res = await fetch("/components");
+  const data = await res.json();
+
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+
+  data.forEach(c => {
+
+list.innerHTML += `
+  <div class="card">
+
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <strong>${c.name}</strong>
+      <span style="
+        background:#2563eb;
+        color:white;
+        padding:4px 8px;
+        border-radius:6px;
+        font-size:12px;">
+        ${c.available_quantity} Available
+      </span>
+    </div>
+
+    <p>Total: ${c.total_quantity}</p>
+
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      ${c.photo1 ? `<img src="${c.photo1}" style="width:100px;border-radius:8px;">` : ""}
+      ${c.photo2 ? `<img src="${c.photo2}" style="width:100px;border-radius:8px;">` : ""}
+    </div>
+
+    <br>
+
+     <button onclick="editComponent(${c.id})">Edit</button>
+
+  </div>
+ `;
+  });
+}
+
+load();
+
+</script>
+
+<script>
+function toggleMenu() {
+  document.getElementById("sidebar").classList.toggle("active");
+}
+</script>
+
+<div id="toast" style="
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: #1e293b;
+  color: white;
+  padding: 12px 18px;
+  border-radius: 8px;
+  display: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+"></div>
+
+<script>
+function showToast(message, success = true) {
+  const toast = document.getElementById("toast");
+  toast.style.background = success ? "#16a34a" : "#dc2626";
+  toast.innerText = message;
+  toast.style.display = "block";
+
+  setTimeout(() => {
+    toast.style.display = "none";
+  }, 2500);
+}
+</script>
+
+<script>
+async function logout() {
+  await fetch("/logout", { method: "POST" });
+  window.location.href = "/login.html";
+}
+</script>
+
+</body>
+</html>

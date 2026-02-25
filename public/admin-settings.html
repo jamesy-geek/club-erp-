@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin Settings</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<div class="menu-toggle" onclick="toggleMenu()">☰ Menu</div>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar" id="sidebar">
+    <h2>Club ERP</h2>
+    <a href="/">Dashboard</a>
+    <a href="/components-page">Components</a>
+    <a href="/issue-page">Issue</a>
+    <a href="/transactions-page">Transactions</a>
+    <a href="/student.html">Student Profile</a>
+    <a href="/admin-settings.html">Admin Settings</a>
+    <a href="#" onclick="logout()">Logout</a>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <h1>Admin Settings</h1>
+
+    <div class="card" style="max-width:400px;">
+
+      <label>New Username</label>
+      <input id="newUsername" placeholder="Enter new username">
+
+      <label style="margin-top:10px;">New Password</label>
+      <input id="newPassword" type="password" placeholder="Enter new password">
+
+      <button style="margin-top:15px;" onclick="updateAdmin()">
+        Update Credentials
+      </button>
+
+    </div>
+
+  </div>
+
+</div>
+
+<h2>Create New Admin</h2>
+
+<input id="newAdminUser" placeholder="Username">
+<input id="newAdminPass" placeholder="Password">
+<select id="newAdmin">
+  <option value="admin">Admin</option>
+</select>
+<button onclick="createAdmin()">Create</button>
+
+<h2>Existing Admins</h2>
+<div id="adminList"></div>
+
+<!-- TOAST -->
+<div id="toast" style="
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: #1e293b;
+  color: white;
+  padding: 12px 18px;
+  border-radius: 8px;
+  display: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+"></div>
+
+<script>
+
+function toggleMenu() {
+  document.getElementById("sidebar").classList.toggle("active");
+}
+
+function showToast(message, success = true) {
+  const toast = document.getElementById("toast");
+  toast.style.background = success ? "#16a34a" : "#dc2626";
+  toast.innerText = message;
+  toast.style.display = "block";
+
+  setTimeout(() => {
+    toast.style.display = "none";
+  }, 2500);
+}
+
+async function updateAdmin() {
+
+  const newUsername = document.getElementById("newUsername").value.trim();
+  const newPassword = document.getElementById("newPassword").value.trim();
+
+  if (!newUsername || !newPassword) {
+    showToast("Both fields required", false);
+    return;
+  }
+
+  if (newPassword.length < 4) {
+    showToast("Password too short", false);
+    return;
+  }
+
+  const res = await fetch("/change-admin", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ newUsername, newPassword })
+  });
+
+  const data = await res.json();
+
+  if (data.success) {
+    showToast("Admin updated successfully");
+    document.getElementById("newPassword").value = "";
+  } else {
+    showToast(data.message, false);
+  }
+}
+
+async function logout() {
+  await fetch("/logout", { method: "POST" });
+  window.location.href = "/login.html";
+}
+
+</script>
+
+<script>
+async function loadAdmins() {
+  const res = await fetch("/admins");
+  if (!res.ok) return;
+
+  const admins = await res.json();
+
+  const container = document.getElementById("adminList");
+  container.innerHTML = "";
+
+  admins.forEach(a => {
+    container.innerHTML += `
+      <div style="margin-bottom:8px;">
+        ${a.username} (${a.role})
+        <button onclick="deleteAdmin(${a.id})">Delete</button>
+      </div>
+    `;
+  });
+}
+
+async function createAdmin() {
+
+  const username = document.getElementById("newAdminUser").value;
+  const password = document.getElementById("newAdminPass").value;
+  const role = document.getElementById("newAdmin").value;
+
+  const res = await fetch("/create-admin", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password, role })
+  });
+
+  const data = await res.json();
+
+  if (data.success) {
+    alert("Admin created");
+    loadAdmins();
+  } else {
+    alert(data.message);
+  }
+}
+
+async function deleteAdmin(id) {
+  await fetch("/delete-admin", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id })
+  });
+  loadAdmins();
+}
+
+loadAdmins();
+</script>
+
+<script>
+async function logout() {
+  await fetch("/logout", { method: "POST" });
+  window.location.href = "/login.html";
+}
+</script>
+
+</body>
+</html>
