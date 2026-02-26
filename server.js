@@ -172,15 +172,19 @@ db.run(`
   )
 `);
 
-db.get("SELECT COUNT(*) as count FROM admins", [], async (err, row) => {
-  if (row.count === 0) {
+db.get("SELECT * FROM admins WHERE username = ?", ["admin"], async (err, row) => {
+  if (!row) {
     const hashed = await bcrypt.hash("admin123", 10);
-    db.run(
-      "INSERT INTO admins (username, password) VALUES (?, ?)",
-      ["admin", hashed]
-    );
-    console.log("Default admin created: admin / admin123");
-  }
+     db.run(
+       "INSERT INTO admins (username, password) VALUES (?, ?)",
+       ["admin", hashed],
+       (err) => {
+         if (!err) {
+           console.log("Default admin created → admin / admin123");
+         }
+       }
+     );
+   }
 });
 
 // ================= PAGE ROUTES =================
@@ -764,4 +768,8 @@ const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
   console.log(`ERP running on port ${PORT}`);
+<<<<<<< HEAD
 });
+=======
+});
+>>>>>>> 0c14fb7 (Fix default admin crash)
