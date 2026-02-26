@@ -20,6 +20,7 @@
    <a href="/components-page">Components</a>
    <a href="/issue-page">Issue</a>
    <a href="/transactions-page">Transactions</a>
+   <a href="/reports-page">Reports</a>
    <a href="/student.html">Student Profile</a>
 
    <hr>
@@ -31,50 +32,71 @@
   <div class="content">
     <h1>Student Profile</h1>
 
-    <input id="usnInput" placeholder="Enter USN">
-    <button onclick="loadProfile()">Search</button>
+   <div style="margin-bottom:15px;">
+     <input type="text" id="searchUSN" placeholder="Enter USN">
+     <button onclick="loadProfile()">Search</button>
+    </div>
 
-  <div id="result"></div>
+  <div id="studentInfo" style="margin-bottom:20px;"></div>
+
+   <table border="1" cellpadding="8" cellspacing="0" width="100%">
+     <thead>
+       <tr>
+         <th>Timestamp</th>
+         <th>Component</th>
+         <th>Issued</th>
+         <th>Returned</th>
+         <th>Remaining</th>
+        </tr>
+      </thead>
+     <tbody id="profileTable"></tbody>
+   </table>
+
+  <div id="profileSummary" style="margin-top:20px; font-weight:bold;"></div>
+</div>
 
 <script>
-
 async function loadProfile() {
 
-  const usn = document.getElementById("usnInput").value.trim();
-  if (!usn) return alert("Enter USN");
+  const usn = document.getElementById("searchUSN").value;
 
-  const res = await fetch(`/student/${usn}`);
+  const res = await fetch("/student/" + usn, {
+    credentials: "same-origin"
+  });
+
   const data = await res.json();
 
-  const result = document.getElementById("result");
-  result.innerHTML = "";
+  const table = document.getElementById("profileTable");
+  const summary = document.getElementById("profileSummary");
 
-  if (data.length === 0) {
-    result.innerHTML = "<p>No records found.</p>";
-    return;
-  }
+  table.innerHTML = "";
 
-  let html = "<ul>";
+  let totalIssued = 0;
+  let totalReturned = 0;
 
-  data.forEach(item => {
+  data.forEach(row => {
 
-    const localTime = new Date(item.issue_timestamp).toLocaleString();
+    totalIssued += row.quantity;
+    totalReturned += row.returned_quantity;
 
-    html += `
-      <li>
-        ${item.component_name}
-        | Issued: ${item.quantity}
-        | Returned: ${item.returned_quantity}
-        | Remaining: ${item.remaining}
-        | Time: ${localTime}
-      </li>
+    table.innerHTML += `
+      <tr>
+        <td>${row.issue_timestamp}</td>
+        <td>${row.component_name}</td>
+        <td>${row.quantity}</td>
+        <td>${row.returned_quantity}</td>
+        <td>${row.remaining}</td>
+      </tr>
     `;
   });
 
-  html += "</ul>";
-
-  result.innerHTML = html;
+  summary.innerHTML = `
+    Total Issued: ${totalIssued} |
+    Total Returned: ${totalReturned} |
+    Currently Holding: ${totalIssued - totalReturned}
+  `;
 }
+</script>
 
 </script>
 

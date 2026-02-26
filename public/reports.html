@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Reports - Club ERP</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      display: flex;
+    }
+
+    .sidebar {
+      width: 220px;
+      background: #1f2937;
+      color: white;
+      height: 100vh;
+      padding: 20px;
+    }
+
+    .sidebar h2 {
+      margin-top: 0;
+      font-size: 20px;
+    }
+
+    .sidebar a {
+      display: block;
+      color: white;
+      text-decoration: none;
+      margin: 10px 0;
+      padding: 8px;
+      border-radius: 5px;
+    }
+
+    .sidebar a:hover {
+      background: #374151;
+    }
+
+    .content {
+      flex: 1;
+      padding: 30px;
+    }
+
+    input, button {
+      padding: 8px;
+      margin: 5px 0;
+      width: 100%;
+      max-width: 300px;
+    }
+
+    button {
+      cursor: pointer;
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 5px;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    .section {
+      margin-bottom: 25px;
+    }
+
+  </style>
+</head>
+
+<body>
+
+  <div class="sidebar">
+    <h2>Club ERP</h2>
+
+    <a href="/">Dashboard</a>
+    <a href="/components-page">Components</a>
+    <a href="/issue-page">Issue</a>
+    <a href="/transactions-page">Transactions</a>
+    <a href="/reports-page">Reports</a>
+    <a href="/student.html">Student Profile</a>
+
+    <hr>
+
+    <a href="/admin-settings.html">Admin Settings</a>
+    <a href="#" onclick="logout()">Logout</a>
+  </div>
+
+  <div class="content">
+    <h1>Download Reports</h1>
+
+    <div class="section">
+      <label>USN (comma separated for multiple)</label><br>
+      <input type="text" id="usnInput" placeholder="4NN22CS001,4NN22CS002">
+    </div>
+
+    <div class="section">
+      <label>Start Date</label><br>
+      <input type="date" id="startDate">
+    </div>
+
+    <div class="section">
+      <label>End Date</label><br>
+      <input type="date" id="endDate">
+    </div>
+
+    <div class="section">
+      <button onclick="downloadExcel()">Download Excel</button>
+      <button onclick="downloadPDF()">Download PDF</button>
+    </div>
+  </div>
+
+  <script>
+
+    function buildQuery() {
+      const usn = document.getElementById("usnInput").value.trim();
+      const startDate = document.getElementById("startDate").value;
+      const endDate = document.getElementById("endDate").value;
+
+      let params = new URLSearchParams();
+
+      if (usn) params.append("usn", usn);
+      if (startDate) params.append("startDate", startDate);
+      if (endDate) params.append("endDate", endDate);
+
+      return "?" + params.toString();
+    }
+
+    function downloadExcel() {
+      window.open("/download-report-excel" + buildQuery(), "_blank");
+    }
+
+    function downloadPDF() {
+      window.open("/download-report-pdf" + buildQuery(), "_blank");
+    }
+
+    async function logout() {
+      await fetch("/logout", { method: "POST", credentials: "same-origin" });
+      window.location.href = "/login.html";
+    }
+
+  </script>
+
+</body>
+</html>

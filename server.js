@@ -68,11 +68,11 @@ db.serialize(() => {
 
   // Issues
   db.run(`
-    CREATE TABLE IF NOT EXISTS issues (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      student_id INTEGER,
-      issue_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY(student_id) REFERENCES students(id)
+   CREATE TABLE IF NOT EXISTS issues (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     student_id INTEGER,
+     issue_timestamp DATETIME DEFAULT (datetime('now', '+5 hours', '+30 minutes')),
+     FOREIGN KEY(student_id) REFERENCES students(id)
     )
   `);
 
@@ -205,6 +205,10 @@ app.get("/student.html", (req, res) => {
   res.sendFile(__dirname + "/public/student.html");
 });
 
+app.get("/reports-page", requireAdmin, (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "reports.html"));
+});
+
 // ================= COMPONENT ROUTES =================
 
 app.post("/add-component", requireAdmin, (req, res) => {
@@ -279,7 +283,7 @@ app.post("/create-issue", requireAdmin, (req, res) => {
   db.serialize(() => {
 
     db.run(
-     `
+      `
        INSERT INTO students (student_name, usn, phone)
        VALUES (?, ?, ?)
        ON CONFLICT(usn) DO UPDATE SET
@@ -287,7 +291,7 @@ app.post("/create-issue", requireAdmin, (req, res) => {
        phone = excluded.phone
       `,
       [student_name, usn, phone]
-     );
+    );
 
     db.get(
       "SELECT id FROM students WHERE usn = ?",
@@ -557,6 +561,202 @@ app.post("/rename-component", requireAdmin, (req, res) => {
     [new_name, id],
     () => res.json({ message: "Renamed successfully" })
   );
+
+});
+
+const PDFDocument = require("pdfkit-table");
+
+app.get("/download-report-pdf", requireAdmin, (req, res) => {
+
+  const { usn, startDate, endDate } = req.query;
+
+  let query = `
+    SELECT 
+      issues.issue_timestamp,
+      students.student_name,
+      students.usn,
+      components.name AS component_name,
+      issue_items.quantity,
+      issue_items.returned_quantity
+    FROM issues
+    JOIN students ON issues.student_id = students.id
+    JOIN issue_items ON issue_items.issue_id = issues.id
+    JOIN components ON issue_items.component_id = components.id
+  `;
+
+  let conditions = [];
+  let params = [];
+
+  if (usn) {
+    const usnArray = usn.split(",");
+    conditions.push(`students.usn IN (${usnArray.map(() => "?").join(",")})`);
+    params.push(...usnArray);
+  }
+
+  if (startDate) {
+    conditions.push("date(issues.issue_timestamp) >= ?");
+    params.push(startDate);
+  }
+
+  if (endDate) {
+    conditions.push("date(issues.issue_timestamp) <= ?");
+    params.push(endDate);
+  }
+
+  if (conditions.length > 0) {
+    query += " WHERE " + conditions.join(" AND ");
+  }
+
+  query += " ORDER BY issues.issue_timestamp DESC";
+
+  db.all(query, params, async (err, rows) => {
+
+    const doc = new PDFDocument({ margin: 30 });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=report.pdf");
+    doc.pipe(res);
+
+    doc.fontSize(18).text("ERP Transactions Report", { align: "center" });
+    doc.moveDown();
+
+    let totalIssued = 0;
+    let totalReturned = 0;
+
+    const table = {
+      headers: [
+        "Timestamp",
+        "Student",
+        "USN",
+        "Component",
+        "Issued",
+        "Returned"
+      ],
+      rows: rows.map(r => {
+        totalIssued += r.quantity;
+        totalReturned += r.returned_quantity;
+
+        return [
+          r.issue_timestamp,
+          r.student_name,
+          r.usn,
+          r.component_name,
+          r.quantity,
+          r.returned_quantity
+        ];
+      })
+    };
+
+    await doc.table(table, {
+      prepareHeader: () => doc.font("Helvetica-Bold").fontSize(10),
+      prepareRow: () => doc.font("Helvetica").fontSize(9)
+    });
+
+    doc.moveDown();
+    doc.fontSize(12).text("Summary", { underline: true });
+    doc.moveDown(0.5);
+    doc.text(`Total Issued: ${totalIssued}`);
+    doc.text(`Total Returned: ${totalReturned}`);
+    doc.text(`Currently Out: ${totalIssued - totalReturned}`);
+
+    doc.end();
+  });
+});
+
+const ExcelJS = require("exceljs");
+
+app.get("/download-report-excel", requireAdmin, async (req, res) => {
+
+  const { usn, startDate, endDate } = req.query;
+
+  let query = `
+    SELECT 
+      issues.issue_timestamp,
+      students.student_name,
+      students.usn,
+      components.name AS component_name,
+      issue_items.quantity,
+      issue_items.returned_quantity
+    FROM issues
+    JOIN students ON issues.student_id = students.id
+    JOIN issue_items ON issue_items.issue_id = issues.id
+    JOIN components ON issue_items.component_id = components.id
+  `;
+
+  let conditions = [];
+  let params = [];
+
+  if (usn) {
+    const usnArray = usn.split(",");
+    conditions.push(`students.usn IN (${usnArray.map(() => "?").join(",")})`);
+    params.push(...usnArray);
+  }
+
+  if (startDate) {
+    conditions.push("date(issues.issue_timestamp) >= ?");
+    params.push(startDate);
+  }
+
+  if (endDate) {
+    conditions.push("date(issues.issue_timestamp) <= ?");
+    params.push(endDate);
+  }
+
+  if (conditions.length > 0) {
+    query += " WHERE " + conditions.join(" AND ");
+  }
+
+  query += " ORDER BY issues.issue_timestamp DESC";
+
+  db.all(query, params, async (err, rows) => {
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Report");
+
+    sheet.columns = [
+      { header: "Timestamp", key: "timestamp", width: 20 },
+      { header: "Student Name", key: "name", width: 20 },
+      { header: "USN", key: "usn", width: 15 },
+      { header: "Component", key: "component", width: 20 },
+      { header: "Issued", key: "issued", width: 10 },
+      { header: "Returned", key: "returned", width: 10 }
+    ];
+
+    let totalIssued = 0;
+    let totalReturned = 0;
+
+    rows.forEach(row => {
+      totalIssued += row.quantity;
+      totalReturned += row.returned_quantity;
+
+      sheet.addRow({
+        timestamp: row.issue_timestamp,
+        name: row.student_name,
+        usn: row.usn,
+        component: row.component_name,
+        issued: row.quantity,
+        returned: row.returned_quantity
+      });
+    });
+
+    sheet.addRow([]);
+    sheet.addRow(["Summary"]);
+    sheet.addRow(["Total Issued", totalIssued]);
+    sheet.addRow(["Total Returned", totalReturned]);
+    sheet.addRow(["Currently Out", totalIssued - totalReturned]);
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=report.xlsx"
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+  });
 
 });
 
