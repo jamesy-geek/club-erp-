@@ -82,6 +82,15 @@ app.use(session({
 
 app.set("trust proxy", 1); // Trust Render's reverse proxy
 
+// Root route MUST be before express.static to take priority over index.html
+app.get("/", (req, res) => {
+  if (req.session && req.session.admin) {
+    res.redirect("/dashboard.html");
+  } else {
+    res.redirect("/login.html");
+  }
+});
+
 app.use(express.static("public"));
 
 // ================= AUTH MIDDLEWARE =================
@@ -294,10 +303,6 @@ app.get("/test-session", (req, res) => {
 });
 
 // ================= PAGE ROUTES =================
-
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "dashboard.html"));
-});
 
 app.get("/components-page", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "components.html"));
