@@ -1,26 +1,29 @@
 {
   "name": "club-erp",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Club ERP System",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "dev": "node server.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@libsql/client": "^0.14.0",
     "bcrypt": "^6.0.0",
     "body-parser": "^2.2.2",
     "cors": "^2.8.6",
+    "dotenv": "^16.4.7",
     "exceljs": "^4.4.0",
-    "express": "^5.2.1",
+    "express": "^4.21.0",
     "express-session": "^1.19.0",
+    "helmet": "^8.0.0",
     "multer": "^2.0.2",
     "pdfkit": "^0.17.2",
     "pdfkit-table": "^0.1.99",
-    "sqlite3": "^5.1.7",
     "xlsx": "^0.18.5"
   }
 }

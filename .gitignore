@@ -1,0 +1,13 @@
+node_modules/
+database.db
+uploads/
+.env
+
+# Firebase files (not needed for Render deployment)
+functions/
+firebase.json
+firestore.rules
+firestore.indexes.json
+firebase-debug.log
+.firebase/
+.firebaserc

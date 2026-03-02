@@ -1,56 +1,59 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <title>Admin Login</title>
   <link rel="stylesheet" href="/style.css">
 </head>
+
 <body>
 
-<div class="layout" style="justify-content:center;align-items:center;">
+  <div class="layout" style="justify-content:center;align-items:center;">
 
-  <div class="card" style="width:300px;">
-    <h2>Admin Login</h2>
+    <div class="card" style="width:300px;">
+      <h2>Admin Login</h2>
 
-    <input id="username" placeholder="Username">
-    <input id="password" type="password" placeholder="Password">
+      <input id="username" placeholder="Username">
+      <input id="password" type="password" placeholder="Password">
 
-    <button onclick="login()">Login</button>
+      <button onclick="login()">Login</button>
+    </div>
+
   </div>
 
-</div>
+  <script>
 
-<script>
-  
-async function login() {
+    async function login() {
 
-  const username = document.querySelector("input[placeholder='Username']").value;
-  const password = document.querySelector("input[placeholder='Password']").value;
+      const username = document.querySelector("input[placeholder='Username']").value;
+      const password = document.querySelector("input[placeholder='Password']").value;
 
-  const res = await fetch("/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "same-origin",
-    body: JSON.stringify({ username, password })
-  });
+      const res = await fetch("/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ username, password })
+      });
 
-  const data = await res.json();
+      const data = await res.json();
 
-  if (data.success) {
-    window.location.href = "/";
-  } else {
-    alert("Invalid credentials");
-  }
-}
-</script>
+      if (data.success) {
+        window.location.href = "/";
+      } else {
+        alert("Invalid credentials");
+      }
+    }
+  </script>
 
-<script>
-async function logout() {
-  await fetch("/logout", { 
-    method: "POST" 
-  });
-  window.location.href = "/login.html";
-}
-</script>
+  <script>
+    async function logout() {
+      await fetch("/logout", {
+        method: "POST"
+      });
+      window.location.href = "/login.html";
+    }
+  </script>
 
 </body>
+
 </html>

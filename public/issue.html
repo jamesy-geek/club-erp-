@@ -1,54 +1,52 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <title>Create Issue</title>
 </head>
+
 <body>
 
-<link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/style.css">
 
-<div class="menu-toggle" onclick="toggleMenu()">
-  ☰ Menu
-</div>
+  <div class="menu-toggle" onclick="toggleMenu()">
+    ☰ Menu
+  </div>
 
-<div class="layout">
+  <div class="layout">
 
-  <div class="sidebar" id="sidebar">
-   <h2>Club ERP</h2>
+    <div class="sidebar" id="sidebar">
+      <h2>Club ERP</h2>
 
-   <a href="/">Dashboard</a>
-   <a href="/components-page">Components</a>
-   <a href="/issue-page">Issue</a>
-   <a href="/transactions-page">Transactions</a>
-   <a href="/reports-page">Reports</a>
-   <a href="/student.html">Student Profile</a>
+      <a href="/">Dashboard</a>
+      <a href="/components-page">Components</a>
+      <a href="/issue-page">Issue</a>
+      <a href="/transactions-page">Transactions</a>
+      <a href="/reports-page">Reports</a>
+      <a href="/student.html">Student Profile</a>
 
-   <hr>
+      <hr>
 
-   <a href="/admin-settings.html">Admin Settings</a>
-   <a href="#" onclick="logout()">Logout</a>
- </div>
+      <a href="/admin-settings.html">Admin Settings</a>
+      <a href="#" onclick="logout()">Logout</a>
+    </div>
 
-  <div class="content">
-    <h1>Create Issue</h1>
+    <div class="content">
+      <h1>Create Issue</h1>
 
-     <div class="card">
-     <input id="studentName" placeholder="Student Name">
-     <input id="usn" placeholder="USN">
-     <input id="phone" placeholder="Phone Number">
-     </div>
+      <div class="card">
+        <input id="studentName" placeholder="Student Name">
+        <input id="usn" placeholder="USN">
+        <input id="phone" placeholder="Phone Number">
+      </div>
 
-  <div class="card">
-      <div style="position:relative;">
+      <div class="card">
+        <div style="position:relative;">
 
-     <input 
-      id="componentSearch"
-      placeholder="Search component..."
-      onkeyup="filterComponents()"
-      onclick="showDropdown()"
-     >
+          <input id="componentSearch" placeholder="Search component..." onkeyup="filterComponents()"
+            onclick="showDropdown()">
 
-   <div id="componentDropdown" style="
+          <div id="componentDropdown" style="
     position:absolute;
     background:white;
     width:100%;
@@ -58,174 +56,178 @@
     display:none;
     z-index:1000;
    ">
-  </div>
+          </div>
 
-   </div>
-      <input id="quantity" type="number" placeholder="Quantity">
-      <button onclick="addToCart()">Add</button>
-     </div>
+        </div>
+        <input id="quantity" type="number" placeholder="Quantity">
+        <button onclick="addToCart()">Add</button>
+      </div>
 
-  <div class="card">
-     <ul id="cartList"></ul>
-     <button onclick="submitIssue()">Submit Issue</button>
-     </div>
-    
-<script>
+      <div class="card">
+        <ul id="cartList"></ul>
+        <button onclick="submitIssue()">Submit Issue</button>
+      </div>
 
-  let allComponents = [];
-  let selectedComponents = null;
+      <script>
 
-let cart = [];
+        let allComponents = [];
+        let selectedComponents = null;
 
-async function loadComponents() {
+        let cart = [];
+        let selectedComponentName = '';
 
-  const res = await fetch("/components");
-  const data = await res.json();
+        async function loadComponents() {
 
-  allComponents = data.filter(c => c.available_quantity > 0);
+          const res = await fetch("/components");
+          const data = await res.json();
 
-}
+          allComponents = data.filter(c => c.available_quantity > 0);
 
-function showDropdown() {
-  renderDropdown(allComponents);
-  document.getElementById("componentDropdown").style.display = "block";
-}
+        }
 
-function filterComponents() {
+        function showDropdown() {
+          renderDropdown(allComponents);
+          document.getElementById("componentDropdown").style.display = "block";
+        }
 
-  const query = document.getElementById("componentSearch").value.toLowerCase();
+        function filterComponents() {
 
-  const filtered = allComponents.filter(c =>
-    c.name.toLowerCase().includes(query)
-  );
+          const query = document.getElementById("componentSearch").value.toLowerCase();
 
-  renderDropdown(filtered);
-}
+          const filtered = allComponents.filter(c =>
+            c.name.toLowerCase().includes(query)
+          );
 
-function renderDropdown(list) {
+          renderDropdown(filtered);
+        }
 
-  const dropdown = document.getElementById("componentDropdown");
-  dropdown.innerHTML = "";
+        function renderDropdown(list) {
 
-  list.forEach(c => {
+          const dropdown = document.getElementById("componentDropdown");
+          dropdown.innerHTML = "";
 
-    const item = document.createElement("div");
-    item.style.padding = "8px";
-    item.style.cursor = "pointer";
+          list.forEach(c => {
 
-    item.innerHTML = `
+            const item = document.createElement("div");
+            item.style.padding = "8px";
+            item.style.cursor = "pointer";
+
+            item.innerHTML = `
       ${c.name}
       <span style="float:right;font-size:12px;color:gray;">
         ${c.available_quantity} available
       </span>
     `;
 
-    item.onclick = () => selectComponent(c);
+            item.onclick = () => selectComponent(c);
 
-    dropdown.appendChild(item);
-  });
+            dropdown.appendChild(item);
+          });
 
-}
+        }
 
-function selectComponent(component) {
+        function selectComponent(component) {
 
-  selectedComponentId = component.id;
+          selectedComponentId = component.id;
+          selectedComponentName = component.name;
 
-  document.getElementById("componentSearch").value = component.name;
+          document.getElementById("componentSearch").value = component.name;
 
-  document.getElementById("componentDropdown").style.display = "none";
-}
+          document.getElementById("componentDropdown").style.display = "none";
+        }
 
-function addToCart() {
+        function addToCart() {
 
-  const component_id = selectedComponentId;
+          const component_id = selectedComponentId;
 
-  if (!component_id) {
-    showToast("Select a component first", false);
-    return;
-  }
+          if (!component_id) {
+            showToast("Select a component first", false);
+            return;
+          }
 
-  const quantity = parseInt(document.getElementById("quantity").value);
+          const quantity = parseInt(document.getElementById("quantity").value);
 
-  if (!quantity || quantity <= 0) {
-    showToast("Enter valid quantity", false);
-    return;
-  }
+          if (!quantity || quantity <= 0) {
+            showToast("Enter valid quantity", false);
+            return;
+          }
 
-  cart.push({
-    component_id,
-    quantity
-  });
+          cart.push({
+            component_id: component_id,
+            component_name: selectedComponentName,
+            quantity
+          });
 
-  showToast("Added to cart");
-} 
+          renderCart();
+          showToast("Added to cart");
+        }
 
-function renderCart() {
-  const list = document.getElementById("cartList");
-  list.innerHTML = "";
+        function renderCart() {
+          const list = document.getElementById("cartList");
+          list.innerHTML = "";
 
-  cart.forEach((item, index) => {
-    list.innerHTML += `
+          cart.forEach((item, index) => {
+            list.innerHTML += `
       <li>
-        Component ID: ${item.component_id} | Quantity: ${item.quantity}
+        ${item.component_name} | Quantity: ${item.quantity}
         <button onclick="removeItem(${index})">Remove</button>
       </li>
     `;
-  });
-}
+          });
+        }
 
-function removeItem(index) {
-  cart.splice(index, 1);
-  renderCart();
-}
+        function removeItem(index) {
+          cart.splice(index, 1);
+          renderCart();
+        }
 
-async function submitIssue() {
+        async function submitIssue() {
 
-  const student_name = document.getElementById("studentName").value.trim();
-  const usn = document.getElementById("usn").value.trim();
-  const phone = document.getElementById("phone").value.trim();
+          const student_name = document.getElementById("studentName").value.trim();
+          const usn = document.getElementById("usn").value.trim();
+          const phone = document.getElementById("phone").value.trim();
 
-  if (!student_name || !usn || !phone || cart.length === 0) {
-    alert("Fill all fields and add components");
-    return;
-  }
+          if (!student_name || !usn || !phone || cart.length === 0) {
+            alert("Fill all fields and add components");
+            return;
+          }
 
-  const res = await fetch("/create-issue", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      student_name,
-      usn,
-      phone,
-      items: cart
-    })
-  });
+          const res = await fetch("/create-issue", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              student_name,
+              usn,
+              phone,
+              items: cart
+            })
+          });
 
-  const data = await res.json();
-  showToast(data.message);
+          const data = await res.json();
+          showToast(data.message);
 
-  cart = [];
-  renderCart();
-  loadComponents();
-}
+          cart = [];
+          renderCart();
+          loadComponents();
+        }
 
-loadComponents();
+        loadComponents();
 
-document.addEventListener("click", function(e) {
-  if (!e.target.closest("#componentSearch")) {
-    document.getElementById("componentDropdown").style.display = "none";
-  }
-});
+        document.addEventListener("click", function (e) {
+          if (!e.target.closest("#componentSearch")) {
+            document.getElementById("componentDropdown").style.display = "none";
+          }
+        });
 
-</script>
+      </script>
 
-<script>
-function toggleMenu() {
-  document.getElementById("sidebar").classList.toggle("active");
-}
-</script>
+      <script>
+        function toggleMenu() {
+          document.getElementById("sidebar").classList.toggle("active");
+        }
+      </script>
 
-<div id="toast" style="
+      <div id="toast" style="
   position: fixed;
   bottom: 20px;
   right: 20px;
@@ -237,25 +239,26 @@ function toggleMenu() {
   box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 "></div>
 
-<script>
-function showToast(message, success = true) {
-  const toast = document.getElementById("toast");
-  toast.style.background = success ? "#16a34a" : "#dc2626";
-  toast.innerText = message;
-  toast.style.display = "block";
+      <script>
+        function showToast(message, success = true) {
+          const toast = document.getElementById("toast");
+          toast.style.background = success ? "#16a34a" : "#dc2626";
+          toast.innerText = message;
+          toast.style.display = "block";
 
-  setTimeout(() => {
-    toast.style.display = "none";
-  }, 2500);
-}
-</script>
+          setTimeout(() => {
+            toast.style.display = "none";
+          }, 2500);
+        }
+      </script>
 
-<script>
-async function logout() {
-  await fetch("/logout", { method: "POST" });
-  window.location.href = "/login.html";
-}
-</script>
+      <script>
+        async function logout() {
+          await fetch("/logout", { method: "POST" });
+          window.location.href = "/login.html";
+        }
+      </script>
 
 </body>
+
 </html>

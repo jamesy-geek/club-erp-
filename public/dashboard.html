@@ -1,76 +1,78 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <title>Dashboard</title>
 </head>
+
 <body>
 
-<link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/style.css">
 
-<div class="menu-toggle" onclick="toggleMenu()">
-  ☰ Menu
-</div>
-
-<div class="layout">
-
-  <div class="sidebar" id="sidebar">
-   <h2>Club ERP</h2>
-
-   <a href="/">Dashboard</a>
-   <a href="/components-page">Components</a>
-   <a href="/issue-page">Issue</a>
-   <a href="/transactions-page">Transactions</a>
-   <a href="/reports-page">Reports</a>
-   <a href="/student.html">Student Profile</a>
-
-   <hr>
-
-   <a href="/admin-settings.html">Admin Settings</a>
-   <a href="#" onclick="logout()">Logout</a>
+  <div class="menu-toggle" onclick="toggleMenu()">
+    ☰ Menu
   </div>
 
-  <div class="content">
-     <h1>Dashboard</h1>
+  <div class="layout">
 
-     <div id="summary"></div>
+    <div class="sidebar" id="sidebar">
+      <h2>Club ERP</h2>
 
-<script>
+      <a href="/">Dashboard</a>
+      <a href="/components-page">Components</a>
+      <a href="/issue-page">Issue</a>
+      <a href="/transactions-page">Transactions</a>
+      <a href="/reports-page">Reports</a>
+      <a href="/student.html">Student Profile</a>
 
-function toggleMenu() {
-  document.getElementById("sidebar").classList.toggle("active");
-}
+      <hr>
 
-async function loadSummary() {
+      <a href="/admin-settings.html">Admin Settings</a>
+      <a href="#" onclick="logout()">Logout</a>
+    </div>
 
-  const res = await fetch("/dashboard-summary", {
-    credentials: "same-origin"
-  });
-  const data = await res.json();
+    <div class="content">
+      <h1>Dashboard</h1>
 
-  const summaryDiv = document.getElementById("summary");
+      <div id="summary"></div>
 
-  if (!summaryDiv) return;
+      <script>
 
-  summaryDiv.innerHTML = `
+        function toggleMenu() {
+          document.getElementById("sidebar").classList.toggle("active");
+        }
+
+        async function loadSummary() {
+
+          const res = await fetch("/dashboard-summary", {
+            credentials: "same-origin"
+          });
+          const data = await res.json();
+
+          const summaryDiv = document.getElementById("summary");
+
+          if (!summaryDiv) return;
+
+          summaryDiv.innerHTML = `
     <div class="card">
       <h3>Total Components: ${data.total_components}</h3>
       <h3>Items Out: ${data.total_out}</h3>
       <h3>Total Students: ${data.total_students}</h3>
     </div>
   `;
-}
+        }
 
-window.onload = loadSummary;
+        window.onload = loadSummary;
 
-</script>
+      </script>
 
-<script>
-function toggleMenu() {
-  document.getElementById("sidebar").classList.toggle("active");
-}
-</script>
+      <script>
+        function toggleMenu() {
+          document.getElementById("sidebar").classList.toggle("active");
+        }
+      </script>
 
-<div id="toast" style="
+      <div id="toast" style="
   position: fixed;
   bottom: 20px;
   right: 20px;
@@ -82,26 +84,28 @@ function toggleMenu() {
   box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 "></div>
 
-<script>
-function showToast(message, success = true) {
-  const toast = document.getElementById("toast");
-  toast.style.background = success ? "#16a34a" : "#dc2626";
-  toast.innerText = message;
-  toast.style.display = "block";
+      <script>
+        function showToast(message, success = true) {
+          const toast = document.getElementById("toast");
+          toast.style.background = success ? "#16a34a" : "#dc2626";
+          toast.innerText = message;
+          toast.style.display = "block";
 
-  setTimeout(() => {
-    toast.style.display = "none";
-  }, 2500);
-}
-</script>
+          setTimeout(() => {
+            toast.style.display = "none";
+          }, 2500);
+        }
+      </script>
 
-<script>
-async function logout() {
-  await fetch("/logout", { 
-    method: "POST" });
-  window.location.href = "/login.html";
-}
-</script>
+      <script>
+        async function logout() {
+          await fetch("/logout", {
+            method: "POST"
+          });
+          window.location.href = "/login.html";
+        }
+      </script>
 
 </body>
+
 </html>
