@@ -596,6 +596,54 @@ app.post("/rename-component", requireAdmin, async (req, res) => {
   res.json({ message: "Renamed successfully" });
 });
 
+// ================= UPDATE COMPONENT PHOTOS =================
+
+app.post("/update-component-photos", requireAdmin, async (req, res) => {
+  const { id, photo1, photo2 } = req.body;
+
+  // Only update photos that were actually provided
+  if (photo1 && photo2) {
+    await db.execute({
+      sql: "UPDATE components SET photo1 = ?, photo2 = ? WHERE id = ?",
+      args: [photo1, photo2, id]
+    });
+  } else if (photo1) {
+    await db.execute({
+      sql: "UPDATE components SET photo1 = ? WHERE id = ?",
+      args: [photo1, id]
+    });
+  } else if (photo2) {
+    await db.execute({
+      sql: "UPDATE components SET photo2 = ? WHERE id = ?",
+      args: [photo2, id]
+    });
+  }
+
+  res.json({ message: "Photos updated successfully" });
+});
+
+// ================= DELETE TRANSACTION =================
+
+app.post("/delete-transaction", requireAdmin, async (req, res) => {
+  const { issue_id } = req.body;
+
+  // Only allow deleting fully-returned issues
+  const check = await db.execute({
+    sql: "SELECT COUNT(*) AS active FROM issue_items WHERE issue_id = ? AND (quantity - returned_quantity) > 0",
+    args: [issue_id]
+  });
+
+  if (check.rows[0].active > 0) {
+    return res.json({ success: false, message: "Cannot delete transaction with unreturned items" });
+  }
+
+  // Delete issue_items first (foreign key), then the issue
+  await db.execute({ sql: "DELETE FROM issue_items WHERE issue_id = ?", args: [issue_id] });
+  await db.execute({ sql: "DELETE FROM issues WHERE id = ?", args: [issue_id] });
+
+  res.json({ success: true, message: "Transaction deleted successfully" });
+});
+
 // ================= DATABASE EXPORT (Monthly Backup) =================
 
 app.get("/export-database", requireAdmin, async (req, res) => {

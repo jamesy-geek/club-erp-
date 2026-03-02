@@ -15,7 +15,7 @@
 
     <!-- SIDEBAR -->
     <div class="sidebar" id="sidebar">
-      <h2>Club ERP</h2>
+      <h2>CERP</h2>
       <a href="/">Dashboard</a>
       <a href="/components-page">Components</a>
       <a href="/issue-page">Issue</a>
@@ -27,6 +27,11 @@
 
       <a href="/admin-settings.html">Admin Settings</a>
       <a href="#" onclick="logout()">Logout</a>
+
+      <div class="sidebar-footer">
+        <img src="/ennovate-logo.png" alt="">
+        <span>Built by Jishnu Abbhay D</span>
+      </div>
     </div>
 
     <!-- CONTENT -->
@@ -34,7 +39,10 @@
 
       <h1>Admin Settings</h1>
 
+      <!-- Update Your Credentials -->
       <div class="card" style="max-width:400px;">
+
+        <h3>Update Your Credentials</h3>
 
         <label>New Username</label>
         <input id="newUsername" placeholder="Enter new username">
@@ -48,27 +56,43 @@
 
       </div>
 
+      <!-- Create New Admin -->
+      <div class="card" style="max-width:400px;">
+
+        <h3>Create New Admin</h3>
+
+        <label>Username</label>
+        <input id="newAdminUser" placeholder="Username">
+
+        <label>Password</label>
+        <input id="newAdminPass" type="password" placeholder="Password">
+
+        <label>Role</label>
+        <select id="newAdmin">
+          <option value="admin">Admin</option>
+        </select>
+
+        <button style="margin-top:15px;" onclick="createAdmin()">Create Admin</button>
+
+      </div>
+
+      <!-- Existing Admins -->
+      <div class="card" style="max-width:400px;">
+        <h3>Existing Admins</h3>
+        <div id="adminList"></div>
+      </div>
+
+      <!-- Database Backup -->
+      <div class="card" style="max-width:400px;">
+        <h3>Database Backup</h3>
+        <p style="color: #666; margin-bottom: 12px;">Download a full backup of all ERP data (components, students,
+          issues). Do this monthly.</p>
+        <button onclick="exportDatabase()">Download Backup (JSON)</button>
+      </div>
+
     </div>
 
   </div>
-
-  <h2>Create New Admin</h2>
-
-  <input id="newAdminUser" placeholder="Username">
-  <input id="newAdminPass" placeholder="Password">
-  <select id="newAdmin">
-    <option value="admin">Admin</option>
-  </select>
-  <button onclick="createAdmin()">Create</button>
-
-  <h2>Existing Admins</h2>
-  <div id="adminList"></div>
-
-  <hr style="margin: 30px 0;">
-
-  <h2>Database Backup</h2>
-  <p style="color: #666;">Download a full backup of all ERP data (components, students, issues). Do this monthly.</p>
-  <button onclick="exportDatabase()" style="background: #059669;">Download Backup (JSON)</button>
 
   <!-- TOAST -->
   <div id="toast" style="
@@ -136,9 +160,12 @@
       window.location.href = "/login.html";
     }
 
-  </script>
+    function exportDatabase() {
+      window.open("/export-database", "_blank");
+    }
 
-  <script>
+    // ===== ADMIN MANAGEMENT =====
+
     async function loadAdmins() {
       const res = await fetch("/admins");
       if (!res.ok) return;
@@ -150,9 +177,9 @@
 
       admins.forEach(a => {
         container.innerHTML += `
-      <div style="margin-bottom:8px;">
-        ${a.username} (${a.role})
-        <button onclick="deleteAdmin('${a.id}')">Delete</button>
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; background:#f8fafc; border-radius:8px; margin-bottom:8px;">
+        <span><strong>${a.username}</strong> <span class="badge badge-blue" style="margin-left:6px;">${a.role}</span></span>
+        <button class="btn-delete" onclick="deleteAdmin('${a.id}')" title="Delete">🗑️</button>
       </div>
     `;
       });
@@ -160,9 +187,14 @@
 
     async function createAdmin() {
 
-      const username = document.getElementById("newAdminUser").value;
-      const password = document.getElementById("newAdminPass").value;
+      const username = document.getElementById("newAdminUser").value.trim();
+      const password = document.getElementById("newAdminPass").value.trim();
       const role = document.getElementById("newAdmin").value;
+
+      if (!username || !password) {
+        showToast("Both fields required", false);
+        return;
+      }
 
       const res = await fetch("/create-admin", {
         method: "POST",
@@ -173,34 +205,36 @@
       const data = await res.json();
 
       if (data.success) {
-        alert("Admin created");
+        showToast("Admin created successfully");
+        document.getElementById("newAdminUser").value = "";
+        document.getElementById("newAdminPass").value = "";
         loadAdmins();
       } else {
-        alert(data.message);
+        showToast(data.message, false);
       }
     }
 
     async function deleteAdmin(id) {
-      await fetch("/delete-admin", {
+      if (!confirm("Are you sure you want to delete this admin?")) return;
+
+      const res = await fetch("/delete-admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id })
       });
-      loadAdmins();
+
+      const data = await res.json();
+
+      if (data.success) {
+        showToast("Admin deleted");
+        loadAdmins();
+      } else {
+        showToast(data.message || "Failed to delete", false);
+      }
     }
 
     loadAdmins();
-  </script>
 
-  <script>
-    async function logout() {
-      await fetch("/logout", { method: "POST" });
-      window.location.href = "/login.html";
-    }
-
-    function exportDatabase() {
-      window.open("/export-database", "_blank");
-    }
   </script>
 
 </body>

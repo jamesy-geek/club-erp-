@@ -17,7 +17,7 @@
   <div class="layout">
 
     <div class="sidebar" id="sidebar">
-      <h2>Club ERP</h2>
+      <h2>CERP</h2>
 
       <a href="/">Dashboard</a>
       <a href="/components-page">Components</a>
@@ -30,6 +30,11 @@
 
       <a href="/admin-settings.html">Admin Settings</a>
       <a href="#" onclick="logout()">Logout</a>
+
+      <div class="sidebar-footer">
+        <img src="/ennovate-logo.png" alt="">
+        <span>Built by Jishnu Abbhay D</span>
+      </div>
     </div>
 
     <div class="content">
@@ -44,6 +49,32 @@
       </div>
 
       <div id="list"></div>
+
+      <!-- ===== EDIT MODAL ===== -->
+      <div class="modal-overlay" id="editModal">
+        <div class="modal-box">
+          <h2>Edit Component</h2>
+
+          <input type="hidden" id="editId">
+
+          <label>Name</label>
+          <input id="editName" placeholder="Component Name">
+
+          <label>Total Quantity</label>
+          <input id="editQty" type="number" placeholder="Total Quantity">
+
+          <label>Photo 1 (optional — leave blank to keep current)</label>
+          <input type="file" id="editPhoto1">
+
+          <label>Photo 2 (optional — leave blank to keep current)</label>
+          <input type="file" id="editPhoto2">
+
+          <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+            <button onclick="saveComponent()">Save Changes</button>
+          </div>
+        </div>
+      </div>
 
       <script>
 
@@ -84,51 +115,63 @@
             })
           });
 
+          document.getElementById("name").value = "";
+          document.getElementById("qty").value = "";
+          document.getElementById("photo1").value = "";
+          document.getElementById("photo2").value = "";
+
+          showToast("Component added");
           load();
         }
 
-        async function editComponent(id) {
+        // ===== EDIT MODAL FUNCTIONS =====
 
-          const res = await fetch("/components");
-          const data = await res.json();
-          const component = data.find(c => c.id === id);
+        function openEditModal(component) {
+          document.getElementById("editId").value = component.id;
+          document.getElementById("editName").value = component.name;
+          document.getElementById("editQty").value = component.total_quantity;
+          document.getElementById("editPhoto1").value = "";
+          document.getElementById("editPhoto2").value = "";
 
-          if (!component) return;
+          document.getElementById("editModal").classList.add("active");
+        }
 
-          const newName = prompt("Edit Name:", component.name);
-          if (newName === null) return;
+        function closeModal() {
+          document.getElementById("editModal").classList.remove("active");
+        }
 
-          const newQty = prompt("Edit Total Quantity:", component.total_quantity);
-          if (newQty === null) return;
+        // Close modal on overlay click
+        document.getElementById("editModal").addEventListener("click", function (e) {
+          if (e.target === this) closeModal();
+        });
 
-          const action = prompt("Type 'delete' to delete this component, or press OK to save changes");
+        async function saveComponent() {
+          const id = document.getElementById("editId").value;
+          const newName = document.getElementById("editName").value.trim();
+          const newQty = parseInt(document.getElementById("editQty").value);
 
-          if (action && action.toLowerCase() === "delete") {
-
-            if (!confirm("Are you sure you want to permanently delete this component?")) return;
-
-            const deleteRes = await fetch("/delete-component", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ id })
-            });
-
-            const deleteData = await deleteRes.json();
-            showToast(deleteData.message, deleteData.message.includes("success"));
-            load();
+          if (!newName || isNaN(newQty)) {
+            showToast("Fill in name and quantity", false);
             return;
           }
 
-          await fetch("/edit-component", {
+          // Update quantity
+          const editRes = await fetch("/edit-component", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               id,
-              new_total_quantity: parseInt(newQty)
+              new_total_quantity: newQty
             })
           });
 
-          // Update name separately
+          const editData = await editRes.json();
+          if (editData.message && editData.message.includes("Cannot")) {
+            showToast(editData.message, false);
+            return;
+          }
+
+          // Update name
           await fetch("/rename-component", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -138,14 +181,50 @@
             })
           });
 
+          // Update photos if new ones were selected
+          const file1 = document.getElementById("editPhoto1").files[0];
+          const file2 = document.getElementById("editPhoto2").files[0];
+
+          if (file1 || file2) {
+            const photo1 = await toBase64(file1);
+            const photo2 = await toBase64(file2);
+
+            await fetch("/update-component-photos", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ id, photo1, photo2 })
+            });
+          }
+
           showToast("Component updated");
+          closeModal();
           load();
         }
 
-        async function load() {
+        // ===== DELETE =====
 
+        async function deleteComponent(id) {
+          if (!confirm("Are you sure you want to permanently delete this component?")) return;
+
+          const res = await fetch("/delete-component", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id })
+          });
+
+          const data = await res.json();
+          showToast(data.message, data.message.includes("success"));
+          load();
+        }
+
+        // ===== LOAD LIST =====
+
+        let allComponentsData = [];
+
+        async function load() {
           const res = await fetch("/components");
           const data = await res.json();
+          allComponentsData = data;
 
           const list = document.getElementById("list");
           list.innerHTML = "";
@@ -157,12 +236,7 @@
 
     <div style="display:flex;justify-content:space-between;align-items:center;">
       <strong>${c.name}</strong>
-      <span style="
-        background:#2563eb;
-        color:white;
-        padding:4px 8px;
-        border-radius:6px;
-        font-size:12px;">
+      <span class="badge badge-blue">
         ${c.available_quantity} Available
       </span>
     </div>
@@ -174,9 +248,10 @@
       ${c.photo2 ? `<img src="${c.photo2}" style="width:100px;border-radius:8px;">` : ""}
     </div>
 
-    <br>
-
-     <button onclick="editComponent('${c.id}')">Edit</button>
+    <div class="action-btns">
+      <button class="btn-edit btn-sm" onclick='openEditModal(${JSON.stringify(c).replace(/'/g, "&#39;")})'>✏️ Edit</button>
+      <button class="btn-delete" onclick="deleteComponent('${c.id}')" title="Delete">🗑️</button>
+    </div>
 
   </div>
  `;

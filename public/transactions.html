@@ -17,7 +17,7 @@
   <div class="layout">
 
     <div class="sidebar" id="sidebar">
-      <h2>Club ERP</h2>
+      <h2>CERP</h2>
 
       <a href="/">Dashboard</a>
       <a href="/components-page">Components</a>
@@ -30,10 +30,21 @@
 
       <a href="/admin-settings.html">Admin Settings</a>
       <a href="#" onclick="logout()">Logout</a>
+
+      <div class="sidebar-footer">
+        <img src="/ennovate-logo.png" alt="">
+        <span>Built by Jishnu Abbhay D</span>
+      </div>
     </div>
 
     <div class="content">
       <h1>Transactions</h1>
+
+      <div style="margin-bottom: 16px;">
+        <button onclick="setFilter('all')" id="filterAll">All</button>
+        <button onclick="setFilter('active')" id="filterActive" class="btn-edit">Active</button>
+        <button onclick="setFilter('completed')" id="filterCompleted" style="background:#334155;">Completed</button>
+      </div>
 
       <div id="container"></div>
 
@@ -82,65 +93,78 @@
           if (currentFilter === "completed" && hasActive) return;
 
           let html = `
-      <div style="border:1px solid black; padding:15px; margin-bottom:20px;
-                  ${!hasActive ? "background:#f0f0f0;" : ""}">
-        <strong>Student:</strong> ${issue.student_name} (${issue.usn})<br>
-        <strong>Phone:</strong> ${issue.phone}<br>
-        <strong>Time:</strong> ${localTime}<br><br>
+      <div class="card" style="${!hasActive ? 'border-left: 4px solid #334155;' : 'border-left: 4px solid #94a3b8;'}">
+        <div class="flex-between" style="margin-bottom:8px;">
+          <div>
+            <strong>${issue.student_name}</strong> (${issue.usn})<br>
+            <span style="color:#64748b;font-size:13px;">📞 ${issue.phone} &nbsp;|&nbsp; 🕐 ${localTime}</span>
+          </div>
+          <div>
     `;
 
           const statusBadge = hasActive
-            ? '<span style="background:#f59e0b;color:white;padding:4px 8px;border-radius:6px;font-size:12px;">ACTIVE</span>'
-            : '<span style="background:#16a34a;color:white;padding:4px 8px;border-radius:6px;font-size:12px;">COMPLETED</span>';
+            ? '<span class="badge badge-amber">ACTIVE</span>'
+            : '<span class="badge badge-green">COMPLETED</span>';
 
-          html += statusBadge + "<br><br>";
+          html += statusBadge;
+          html += `</div></div>`;
+
+          html += `<div class="action-btns" style="margin-bottom:12px;">`;
 
           if (hasActive) {
             html += `
-        <button onclick="returnAll('${issue_id}')">
-          Return All
+        <button class="btn-sm" onclick="returnAll('${issue_id}')">
+          ↩️ Return All
         </button>
       `;
           } else {
             html += `
-        <span style="color:green; font-weight:bold;">
-          ✔ Fully Completed
+        <span style="color:#334155; font-weight:bold; font-size:13px;">
+          ✔ Fully Returned
         </span>
+        <button class="btn-delete" onclick="deleteTransaction('${issue_id}')" title="Delete">🗑️</button>
       `;
           }
 
-          html += "<ul>";
+          html += `</div>`;
+
+          html += "<ul style='list-style:none;padding:0;'>";
 
           issue.items.forEach(item => {
 
             html += `
-        <li style="margin-top:10px;">
+        <li style="margin-top:10px; padding:10px; background:#f8fafc; border-radius:8px;">
           <strong>${item.component_name}</strong><br>
-          Issued: ${item.quantity} |
-          Returned: ${item.returned_quantity} |
-          Remaining: ${item.remaining}
+          <span style="font-size:13px;color:#475569;">
+            Issued: ${item.quantity} &nbsp;|&nbsp;
+            Returned: ${item.returned_quantity} &nbsp;|&nbsp;
+            Remaining: ${item.remaining}
+          </span>
           <br>
       `;
 
             if (item.remaining > 0) {
 
               html += `
-          <input 
-            type="number" 
-            id="return-${item.item_id}" 
-            placeholder="Qty"
-            min="1"
-            max="${item.remaining}"
-          >
-          <button onclick="returnItem('${item.item_id}', '${item.component_id}')">
-            Return
-          </button>
+          <div style="margin-top:6px; display:flex; gap:8px; align-items:center;">
+            <input
+              type="number"
+              id="return-${item.item_id}"
+              placeholder="Qty"
+              min="1"
+              max="${item.remaining}"
+              style="width:80px;"
+            >
+            <button class="btn-sm" onclick="returnItem('${item.item_id}', '${item.component_id}')">
+              Return
+            </button>
+          </div>
         `;
 
             } else {
 
               html += `
-          <span style="color:green;">
+          <span style="color:#334155; font-size:12px;">
             ✔ Returned
           </span>
         `;
@@ -198,6 +222,23 @@
         });
 
         showToast("All items returned");
+        load();
+      }
+
+      // ================= DELETE TRANSACTION =================
+
+      async function deleteTransaction(issue_id) {
+
+        if (!confirm("Permanently delete this completed transaction?")) return;
+
+        const res = await fetch("/delete-transaction", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ issue_id })
+        });
+
+        const data = await res.json();
+        showToast(data.message, data.success);
         load();
       }
 
