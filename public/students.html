@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Students Directory</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+
+<body>
+    <link rel="stylesheet" href="/style.css">
+
+    <div class="menu-toggle" onclick="toggleMenu()">
+        ☰ Menu
+    </div>
+
+    <div class="layout">
+        <div class="sidebar" id="sidebar">
+            <h2>CERP</h2>
+            <a href="/">Dashboard</a>
+            <a href="/components-page">Components</a>
+            <a href="/issue-page">Issue</a>
+            <a href="/transactions-page">Transactions</a>
+            <a href="/reports-page">Reports</a>
+            <a href="/student.html">Student Profile</a>
+            <a href="/students.html" class="active">Students</a>
+            <hr>
+            <a href="/admin-settings.html">Admin Settings</a>
+            <a href="#" onclick="logout()">Logout</a>
+
+            <div class="sidebar-footer">
+                <img src="/ennovate-logo.png" alt="">
+                <span>Built by Jishnu Abbhay D</span>
+            </div>
+        </div>
+
+        <div class="content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h1>Students Directory</h1>
+            </div>
+
+            <div class="card">
+                <input type="text" id="searchInput" placeholder="Search by USN or Name..." onkeyup="filterTable()"
+                    style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 20px; box-sizing: border-box;">
+
+                <table border="0" width="100%" class="data-table">
+                    <thead>
+                        <tr style="text-align: left; background: #f8fafc;">
+                            <th style="padding: 12px;">Student Name</th>
+                            <th style="padding: 12px;">USN</th>
+                            <th style="padding: 12px;">Phone</th>
+                            <th style="padding: 12px; text-align: right;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="studentsTable"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <h2 id="modalLabel">Edit Student</h2>
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label>Name</label>
+                <input type="text" id="editName"
+                    style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ccc;">
+            </div>
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label>Phone</label>
+                <input type="text" id="editPhone"
+                    style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ccc;">
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveStudent()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast"
+        style="position: fixed; bottom: 20px; right: 20px; color: white; padding: 12px 18px; border-radius: 8px; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 10000;">
+    </div>
+
+    <style>
+        .data-table tr {
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .data-table td {
+            padding: 12px;
+            vertical-align: middle;
+        }
+
+        .btn {
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            border: none;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .btn-primary {
+            background: #2563eb;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #f1f5f9;
+            color: #475569;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            width: 400px;
+            max-width: 90%;
+        }
+
+        .actions-cell {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+    </style>
+
+    <script>
+        let currentStudentId = null;
+        let allStudents = [];
+
+        async function loadStudents() {
+            const res = await fetch("/students?t=" + Date.now());
+            allStudents = await res.json();
+            renderTable(allStudents);
+        }
+
+        function renderTable(students) {
+            const table = document.getElementById("studentsTable");
+            table.innerHTML = students.map(s => `
+        <tr>
+          <td><span style="font-weight: 600; color: #1e293b;">${s.student_name}</span></td>
+          <td><code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; color: #475569;">${s.usn}</code></td>
+          <td>${s.phone || 'N/A'}</td>
+          <td class="actions-cell">
+            <button class="btn btn-secondary" onclick="viewProfile('${s.usn}')">View</button>
+            <button class="btn btn-primary" onclick="openEditModal(${s.id}, '${s.student_name.replace(/'/g, "\\'")}', '${s.phone || ''}')">Edit</button>
+            <button class="btn btn-danger" onclick="deleteStudent(${s.id}, '${s.student_name.replace(/'/g, "\\'")}')">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+        }
+
+        function filterTable() {
+            const query = document.getElementById("searchInput").value.toLowerCase();
+            const filtered = allStudents.filter(s =>
+                s.student_name.toLowerCase().includes(query) ||
+                s.usn.toLowerCase().includes(query)
+            );
+            renderTable(filtered);
+        }
+
+        function viewProfile(usn) {
+            window.location.href = `/student.html?usn=${usn}`;
+        }
+
+        function openEditModal(id, name, phone) {
+            currentStudentId = id;
+            document.getElementById("editName").value = name;
+            document.getElementById("editPhone").value = phone;
+            document.getElementById("editModal").style.display = "flex";
+        }
+
+        function closeModal() {
+            document.getElementById("editModal").style.display = "none";
+        }
+
+        async function saveStudent() {
+            const name = document.getElementById("editName").value;
+            const phone = document.getElementById("editPhone").value;
+
+            const res = await fetch("/edit-student", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: currentStudentId, student_name: name, phone })
+            });
+
+            const result = await res.json();
+            if (result.success) {
+                showToast("Student updated successfully");
+                closeModal();
+                loadStudents();
+            } else {
+                showToast(result.message, false);
+            }
+        }
+
+        async function deleteStudent(id, name) {
+            if (!confirm(`Are you sure you want to delete ${name}? This will also remove their transaction history.`)) return;
+
+            const res = await fetch("/delete-student", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id })
+            });
+
+            const result = await res.json();
+            if (result.success) {
+                showToast("Student deleted successfully");
+                loadStudents();
+            } else {
+                alert(result.message);
+            }
+        }
+
+        function showToast(message, success = true) {
+            const toast = document.getElementById("toast");
+            toast.style.background = success ? "#16a34a" : "#dc2626";
+            toast.innerText = message;
+            toast.style.display = "block";
+            setTimeout(() => toast.style.display = "none", 2500);
+        }
+
+        function toggleMenu() {
+            document.getElementById("sidebar").classList.toggle("active");
+        }
+
+        async function logout() {
+            await fetch("/logout", { method: "POST" });
+            window.location.href = "/login.html";
+        }
+
+        window.onload = loadStudents;
+    </script>
+</body>
+
+</html>

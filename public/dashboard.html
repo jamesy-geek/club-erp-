@@ -19,16 +19,17 @@
     <div class="sidebar" id="sidebar">
       <h2>CERP</h2>
 
-      <a href="/">Dashboard</a>
-      <a href="/components-page">Components</a>
-      <a href="/issue-page">Issue</a>
-      <a href="/transactions-page">Transactions</a>
-      <a href="/reports-page">Reports</a>
-      <a href="/student.html">Student Profile</a>
+      <a href="/" id="nav-dashboard" class="active">Dashboard</a>
+      <a href="/components-page" id="nav-components">Components</a>
+      <a href="/issue-page" id="nav-issue">Issue</a>
+      <a href="/transactions-page" id="nav-transactions">Transactions</a>
+      <a href="/reports-page" id="nav-reports">Reports</a>
+      <a href="/students-page" id="nav-students">Students</a>
+      <a href="/student.html" id="nav-profile">Student Profile</a>
 
       <hr>
 
-      <a href="/admin-settings.html">Admin Settings</a>
+      <a href="/admin-settings.html" id="nav-settings">Admin Settings</a>
       <a href="#" onclick="logout()">Logout</a>
 
       <div class="sidebar-footer">
@@ -51,33 +52,42 @@
         }
 
         async function loadSummary() {
-
           const res = await fetch("/dashboard-summary", {
             credentials: "same-origin"
           });
           const data = await res.json();
 
           const summaryDiv = document.getElementById("summary");
-
           if (!summaryDiv) return;
 
+          let lowStockHtml = "";
+          if (data.low_stock && data.low_stock.length > 0) {
+            lowStockHtml = `
+              <div class="card" style="margin-top:20px; border-left: 5px solid #ef4444;">
+                <h3 style="color:#ef4444; margin-top:0;">⚠️ Low Stock Alerts</h3>
+                <ul style="list-style: none; padding: 0;">
+                  ${data.low_stock.map(item => `
+                    <li style="margin-bottom: 8px; display: flex; justify-content: space-between;">
+                      <span>${item.name}</span>
+                      <span style="font-weight: bold; color: #ef4444;">${item.available_quantity} left</span>
+                    </li>
+                  `).join('')}
+                </ul>
+              </div>
+            `;
+          }
+
           summaryDiv.innerHTML = `
-    <div class="card">
-      <h3>Total Components: ${data.total_components}</h3>
-      <h3>Items Out: ${data.total_out}</h3>
-      <h3>Total Students: ${data.total_students}</h3>
-    </div>
-  `;
+            <div class="card">
+              <h3>Total Components: ${data.total_components}</h3>
+              <h3>Items Out: ${data.total_out}</h3>
+              <h3>Total Students: ${data.total_students}</h3>
+            </div>
+            ${lowStockHtml}
+          `;
         }
 
         window.onload = loadSummary;
-
-      </script>
-
-      <script>
-        function toggleMenu() {
-          document.getElementById("sidebar").classList.toggle("active");
-        }
       </script>
 
       <div id="toast" style="

@@ -369,6 +369,10 @@ app.get("/reports-page", requireAdmin, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "reports.html"));
 });
 
+app.get("/students-page", requireAdmin, (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "students.html"));
+});
+
 // ================= COMPONENT ROUTES =================
 
 app.post("/add-component", requireAdmin, async (req, res) => {
@@ -460,7 +464,7 @@ app.post("/create-issue", requireAdmin, async (req, res) => {
         args: [parseInt(item.component_id)]
       });
       if (compResult.rows.length === 0 || compResult.rows[0].available_quantity < parseInt(item.quantity)) {
-        return res.json({ message: `Insufficient stock for component ID ${item.component_id}` });
+        return res.json({ success: false, message: `Insufficient stock for ${item.component_name || 'component'}` });
       }
     }
 
@@ -602,17 +606,59 @@ app.get("/student/:usn", async (req, res) => {
   res.json(result.rows);
 });
 
+// ================= STUDENTS DIRECTORY =================
+
+app.get("/students", async (req, res) => {
+  const result = await db.execute("SELECT * FROM students ORDER BY student_name ASC");
+  res.json(result.rows);
+});
+
+app.post("/edit-student", requireAdmin, async (req, res) => {
+  const { id, student_name, phone } = req.body;
+  await db.execute({
+    sql: "UPDATE students SET student_name = ?, phone = ? WHERE id = ?",
+    args: [student_name, phone, id]
+  });
+  res.json({ success: true, message: "Student updated successfully" });
+});
+
+app.post("/delete-student", requireAdmin, async (req, res) => {
+  const { id } = req.body;
+
+  // Check for active issues
+  const activeCheck = await db.execute({
+    sql: "SELECT COUNT(*) AS active FROM issues JOIN issue_items ON issues.id = issue_items.issue_id WHERE issues.student_id = ? AND (issue_items.quantity - issue_items.returned_quantity) > 0",
+    args: [id]
+  });
+
+  if (activeCheck.rows[0].active > 0) {
+    return res.json({ success: false, message: "Cannot delete student with unreturned items" });
+  }
+
+  // Delete issues and their items first
+  const issues = await db.execute({ sql: "SELECT id FROM issues WHERE student_id = ?", args: [id] });
+  for (const issue of issues.rows) {
+    await db.execute({ sql: "DELETE FROM issue_items WHERE issue_id = ?", args: [issue.id] });
+    await db.execute({ sql: "DELETE FROM issues WHERE id = ?", args: [issue.id] });
+  }
+
+  await db.execute({ sql: "DELETE FROM students WHERE id = ?", args: [id] });
+  res.json({ success: true, message: "Student and their transaction history deleted" });
+});
+
 // ================= DASHBOARD SUMMARY =================
 
 app.get("/dashboard-summary", async (req, res) => {
   const r1 = await db.execute("SELECT COUNT(*) AS total_components FROM components");
   const r2 = await db.execute("SELECT SUM(quantity - returned_quantity) AS total_out FROM issue_items");
   const r3 = await db.execute("SELECT COUNT(*) AS total_students FROM students");
+  const lowStock = await db.execute("SELECT name, available_quantity FROM components WHERE available_quantity < 5 ORDER BY available_quantity ASC");
 
   res.json({
     total_components: r1.rows[0].total_components || 0,
     total_out: r2.rows[0].total_out || 0,
-    total_students: r3.rows[0].total_students || 0
+    total_students: r3.rows[0].total_students || 0,
+    low_stock: lowStock.rows
   });
 });
 

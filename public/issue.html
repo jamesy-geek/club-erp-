@@ -19,16 +19,17 @@
     <div class="sidebar" id="sidebar">
       <h2>CERP</h2>
 
-      <a href="/">Dashboard</a>
-      <a href="/components-page">Components</a>
-      <a href="/issue-page">Issue</a>
-      <a href="/transactions-page">Transactions</a>
-      <a href="/reports-page">Reports</a>
-      <a href="/student.html">Student Profile</a>
+      <a href="/" id="nav-dashboard">Dashboard</a>
+      <a href="/components-page" id="nav-components">Components</a>
+      <a href="/issue-page" id="nav-issue" class="active">Issue</a>
+      <a href="/transactions-page" id="nav-transactions">Transactions</a>
+      <a href="/reports-page" id="nav-reports">Reports</a>
+      <a href="/students-page" id="nav-students">Students</a>
+      <a href="/student.html" id="nav-profile">Student Profile</a>
 
       <hr>
 
-      <a href="/admin-settings.html">Admin Settings</a>
+      <a href="/admin-settings.html" id="nav-settings">Admin Settings</a>
       <a href="#" onclick="logout()">Logout</a>
 
       <div class="sidebar-footer">
@@ -77,7 +78,8 @@
       <script>
 
         let allComponents = [];
-        let selectedComponents = null;
+        let selectedComponentId = null;
+        let selectedComponentAvailable = 0;
 
         let cart = [];
         let selectedComponentName = '';
@@ -99,6 +101,12 @@
         function filterComponents() {
 
           const query = document.getElementById("componentSearch").value.toLowerCase();
+
+          // Reset selection on search
+          selectedComponentId = null;
+          selectedComponentAvailable = 0;
+          document.getElementById("quantity").max = "";
+          document.getElementById("quantity").placeholder = "Quantity";
 
           const filtered = allComponents.filter(c =>
             c.name.toLowerCase().includes(query)
@@ -136,6 +144,12 @@
 
           selectedComponentId = component.id;
           selectedComponentName = component.name;
+          selectedComponentAvailable = component.available_quantity;
+
+          const qtyInput = document.getElementById("quantity");
+          qtyInput.value = "";
+          qtyInput.max = component.available_quantity;
+          qtyInput.placeholder = `Qty (Max ${component.available_quantity})`;
 
           document.getElementById("componentSearch").value = component.name;
 
@@ -155,6 +169,15 @@
 
           if (!quantity || quantity <= 0) {
             showToast("Enter valid quantity", false);
+            return;
+          }
+
+          const existingInCart = cart
+            .filter(item => item.component_id === component_id)
+            .reduce((sum, item) => sum + item.quantity, 0);
+
+          if (existingInCart + quantity > selectedComponentAvailable) {
+            showToast(`Total quantity exceeds available stock (${selectedComponentAvailable})`, false);
             return;
           }
 
