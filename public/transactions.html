@@ -60,7 +60,7 @@
       }
 
       async function load() {
-        const res = await fetch("/transactions");
+        const res = await fetch("/transactions?t=" + Date.now());
         const data = await res.json();
 
         const container = document.getElementById("container");

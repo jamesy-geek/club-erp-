@@ -68,15 +68,56 @@ setInterval(() => {
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
+// ================= CUSTOM SESSION STORE (TURSO) =================
+const { Store } = session;
+class TursoStore extends Store {
+  constructor(client) {
+    super();
+    this.db = client;
+  }
+  async get(sid, cb) {
+    try {
+      const result = await this.db.execute({
+        sql: "SELECT data FROM sessions WHERE id = ?",
+        args: [sid]
+      });
+      if (result.rows.length === 0) return cb(null, null);
+      cb(null, JSON.parse(result.rows[0].data));
+    } catch (err) {
+      cb(err);
+    }
+  }
+  async set(sid, sessionData, cb) {
+    try {
+      await this.db.execute({
+        sql: "INSERT INTO sessions (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data",
+        args: [sid, JSON.stringify(sessionData)]
+      });
+      if (cb) cb(null);
+    } catch (err) {
+      if (cb) cb(err);
+    }
+  }
+  async destroy(sid, cb) {
+    try {
+      await this.db.execute({ sql: "DELETE FROM sessions WHERE id = ?", args: [sid] });
+      if (cb) cb(null);
+    } catch (err) {
+      if (cb) cb(err);
+    }
+  }
+}
+
 app.use(session({
+  store: new TursoStore(db),
   secret: process.env.SESSION_SECRET || "super_secret_erp_key",
   resave: false,
   saveUninitialized: false,
   cookie: {
     secure: process.env.NODE_ENV === "production" && process.env.RENDER === "true",
-    httpOnly: true,       // Prevents JavaScript access to cookies
-    maxAge: 8 * 60 * 60 * 1000, // 8 hours
-    sameSite: "lax"       // CSRF protection
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: "lax"
   }
 }));
 
@@ -152,6 +193,14 @@ async function initDB() {
       returned_quantity INTEGER DEFAULT 0,
       FOREIGN KEY(issue_id) REFERENCES issues(id),
       FOREIGN KEY(component_id) REFERENCES components(id)
+    )
+  `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY,
+      data TEXT,
+      expires DATETIME
     )
   `);
 
@@ -420,7 +469,7 @@ app.post("/create-issue", requireAdmin, async (req, res) => {
       args: [student_id]
     });
 
-    const issue_id = issueResult.lastInsertRowid;
+    const issue_id = Number(issueResult.lastInsertRowid);
 
     for (const item of items) {
       const cid = parseInt(item.component_id);

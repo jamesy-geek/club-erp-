@@ -84,7 +84,7 @@
 
         async function loadComponents() {
 
-          const res = await fetch("/components");
+          const res = await fetch("/components?t=" + Date.now());
           const data = await res.json();
 
           allComponents = data.filter(c => c.available_quantity > 0);
