@@ -44,6 +44,15 @@ body {
   margin: 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sidebar h2 img {
+  width: 70px;
+  filter: brightness(0) invert(1);
+  opacity: 0.9;
 }
 
 .sidebar a {
@@ -74,12 +83,12 @@ body {
   margin-top: auto;
   padding: 12px 8px 4px;
   text-align: center;
-  opacity: 0.15;
+  opacity: 0.4;
   transition: opacity 0.4s ease;
 }
 
 .sidebar-footer:hover {
-  opacity: 0.55;
+  opacity: 0.8;
 }
 
 .sidebar-footer img {

@@ -17,7 +17,7 @@
   <div class="layout">
 
     <div class="sidebar" id="sidebar">
-      <h2>CERP</h2>
+      <h2><img src="/ennovate-logo.png" alt=""> CERP</h2>
 
       <a href="/" id="nav-dashboard">Dashboard</a>
       <a href="/components-page" id="nav-components" class="active">Components</a>
@@ -47,6 +47,25 @@
         <input id="name" placeholder="Component Name">
         <input id="qty" type="number" placeholder="Quantity">
         <button onclick="addComponent()">Add</button>
+      </div>
+
+      <!-- Bulk Import Section -->
+      <div class="card" style="border-left: 4px solid #7c3aed;">
+        <h3 style="margin-bottom: 8px;">📥 Bulk Import Components</h3>
+        <p style="color: #64748b; font-size: 13px; margin-bottom: 12px;">
+          Upload an <strong>Excel (.xlsx, .csv)</strong> or <strong>PDF</strong> file to add components in bulk.<br>
+          <strong>Format:</strong> Your file must have a <code
+            style="background:#f1f5f9; padding:2px 6px; border-radius:4px;">Name</code> column and a <code
+            style="background:#f1f5f9; padding:2px 6px; border-radius:4px;">Quantity</code> column.
+          Existing components will have their quantities updated.
+        </p>
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+          <input type="file" id="importFile" accept=".xlsx,.csv,.pdf" style="flex: 1; min-width: 200px;">
+          <button onclick="importComponents()" style="background: #7c3aed; color: white; white-space: nowrap;">
+            Upload & Import
+          </button>
+        </div>
+        <div id="importStatus" style="margin-top: 10px; font-size: 13px; display: none;"></div>
       </div>
 
       <div id="list"></div>
@@ -277,6 +296,49 @@
   </div>
  `;
           });
+        }
+
+        // ===== BULK IMPORT =====
+
+        async function importComponents() {
+          const fileInput = document.getElementById("importFile");
+          const statusDiv = document.getElementById("importStatus");
+
+          if (!fileInput.files[0]) {
+            showToast("Please select a file first", false);
+            return;
+          }
+
+          statusDiv.style.display = "block";
+          statusDiv.style.color = "#64748b";
+          statusDiv.innerHTML = "⏳ Importing... please wait.";
+
+          const formData = new FormData();
+          formData.append("file", fileInput.files[0]);
+
+          try {
+            const res = await fetch("/import-components", {
+              method: "POST",
+              body: formData
+            });
+            const data = await res.json();
+
+            if (data.success) {
+              statusDiv.style.color = "#16a34a";
+              statusDiv.innerHTML = `✅ ${data.message}`;
+              showToast(data.message);
+              fileInput.value = "";
+              load(); // Refresh component list
+            } else {
+              statusDiv.style.color = "#dc2626";
+              statusDiv.innerHTML = `❌ ${data.message}`;
+              showToast(data.message, false);
+            }
+          } catch (error) {
+            statusDiv.style.color = "#dc2626";
+            statusDiv.innerHTML = "❌ Upload failed. Please try again.";
+            showToast("Upload failed", false);
+          }
         }
 
         load();

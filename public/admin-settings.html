@@ -15,7 +15,7 @@
 
     <!-- SIDEBAR -->
     <div class="sidebar" id="sidebar">
-      <h2>CERP</h2>
+      <h2><img src="/ennovate-logo.png" alt=""> CERP</h2>
       <a href="/" id="nav-dashboard">Dashboard</a>
       <a href="/components-page" id="nav-components">Components</a>
       <a href="/issue-page" id="nav-issue">Issue</a>
@@ -88,7 +88,11 @@
         <h3>Database Backup</h3>
         <p style="color: #666; margin-bottom: 12px;">Download a full backup of all ERP data (components, students,
           issues). Do this monthly.</p>
-        <button onclick="exportDatabase()">Download Backup (JSON)</button>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <button onclick="exportDatabase()">Download Backup (JSON)</button>
+          <button onclick="exportDatabasePDF()" style="background: #7c3aed; color: white;">Download Backup
+            (PDF)</button>
+        </div>
       </div>
 
     </div>
@@ -163,6 +167,10 @@
 
     function exportDatabase() {
       window.open("/export-database", "_blank");
+    }
+
+    function exportDatabasePDF() {
+      window.open("/export-database-pdf", "_blank");
     }
 
     // ===== ADMIN MANAGEMENT =====
