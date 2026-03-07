@@ -1,13 +1,27 @@
-<!-- This file intentionally left minimal. The Express server handles / routing. -->
 <!DOCTYPE html>
 <html>
 
 <head>
   <title>CERP</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 
 <body>
   <p>Loading...</p>
+  <script>
+    // Check if user is authenticated, redirect accordingly
+    fetch('/dashboard-summary', { credentials: 'same-origin' })
+      .then(res => {
+        if (res.ok) {
+          window.location.href = '/dashboard.html';
+        } else {
+          window.location.href = '/login.html';
+        }
+      })
+      .catch(() => {
+        window.location.href = '/login.html';
+      });
+  </script>
 </body>
 
 </html>
