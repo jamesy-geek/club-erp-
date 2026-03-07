@@ -1,7 +1,7 @@
 const express = require("express");
 const { createClient } = require("@libsql/client");
 const session = require("express-session");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 const path = require("path");
 const helmet = require("helmet");
 
