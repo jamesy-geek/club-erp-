@@ -140,6 +140,9 @@ function requireAdmin(req, res, next) {
 // ================= DATABASE SETUP =================
 
 async function initDatabase() {
+  // Drop and recreate sessions table to fix schema mismatches
+  // (sessions are transient — users just re-login)
+  await db.execute(`DROP TABLE IF EXISTS sessions`);
   await db.execute(`CREATE TABLE IF NOT EXISTS sessions (
     sid TEXT PRIMARY KEY,
     data TEXT,
