@@ -80,7 +80,8 @@ class TursoStore extends session.Store {
       }
     } catch (err) {
       console.error("Session GET error:", err.message);
-      callback(err);
+      // Return null session instead of propagating error (prevents 500 on every request)
+      callback(null, null);
     }
   }
   async set(sid, sessionData, callback) {
@@ -92,7 +93,7 @@ class TursoStore extends session.Store {
       if (callback) callback(null);
     } catch (err) {
       console.error("Session SET error:", err.message);
-      if (callback) callback(err);
+      if (callback) callback(null); // Don't propagate — session just won't persist
     }
   }
   async destroy(sid, callback) {
@@ -101,7 +102,7 @@ class TursoStore extends session.Store {
       if (callback) callback(null);
     } catch (err) {
       console.error("Session DESTROY error:", err.message);
-      if (callback) callback(err);
+      if (callback) callback(null); // Don't propagate
     }
   }
 }
@@ -1020,6 +1021,15 @@ app.get("/download-report-excel", requireAdmin, async (req, res) => {
 
   await workbook.xlsx.write(res);
   res.end();
+});
+
+// ================= GLOBAL ERROR HANDLER =================
+
+app.use((err, req, res, next) => {
+  console.error("Unhandled error:", err.stack || err.message || err);
+  if (!res.headersSent) {
+    res.status(500).json({ message: "Internal server error" });
+  }
 });
 
 // ================= START SERVER =================
