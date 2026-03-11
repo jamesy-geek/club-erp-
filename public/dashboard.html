@@ -52,39 +52,53 @@
         }
 
         async function loadSummary() {
-          const res = await fetch("/dashboard-summary", {
-            credentials: "same-origin"
-          });
-          const data = await res.json();
+          try {
+            const res = await fetch("/dashboard-summary", {
+              credentials: "same-origin"
+            });
+            if (res.status === 401) {
+              window.location.href = "/login.html";
+              return;
+            }
+            if (!res.ok) {
+              console.error("Dashboard load failed:", res.status);
+              document.getElementById("summary").innerHTML = '<div class="card" style="border-left: 5px solid #ef4444;"><h3 style="color:#ef4444;">Error loading dashboard</h3><p>Please <a href="/login.html">login again</a>.</p></div>';
+              return;
+            }
+            const data = await res.json();
 
-          const summaryDiv = document.getElementById("summary");
-          if (!summaryDiv) return;
+            const summaryDiv = document.getElementById("summary");
+            if (!summaryDiv) return;
 
-          let lowStockHtml = "";
-          if (data.low_stock && data.low_stock.length > 0) {
-            lowStockHtml = `
-              <div class="card" style="margin-top:20px; border-left: 5px solid #ef4444;">
-                <h3 style="color:#ef4444; margin-top:0;">⚠️ Low Stock Alerts</h3>
-                <ul style="list-style: none; padding: 0;">
-                  ${data.low_stock.map(item => `
-                    <li style="margin-bottom: 8px; display: flex; justify-content: space-between;">
-                      <span>${item.name}</span>
-                      <span style="font-weight: bold; color: #ef4444;">${item.available_quantity} left</span>
-                    </li>
-                  `).join('')}
-                </ul>
+            let lowStockHtml = "";
+            if (data.low_stock && data.low_stock.length > 0) {
+              lowStockHtml = `
+                <div class="card" style="margin-top:20px; border-left: 5px solid #ef4444;">
+                  <h3 style="color:#ef4444; margin-top:0;">⚠️ Low Stock Alerts</h3>
+                  <ul style="list-style: none; padding: 0;">
+                    ${data.low_stock.map(item => `
+                      <li style="margin-bottom: 8px; display: flex; justify-content: space-between;">
+                        <span>${item.name}</span>
+                        <span style="font-weight: bold; color: #ef4444;">${item.available_quantity} left</span>
+                      </li>
+                    `).join('')}
+                  </ul>
+                </div>
+              `;
+            }
+
+            summaryDiv.innerHTML = `
+              <div class="card">
+                <h3>Total Components: ${data.total_components}</h3>
+                <h3>Items Out: ${data.total_out}</h3>
+                <h3>Total Students: ${data.total_students}</h3>
               </div>
+              ${lowStockHtml}
             `;
+          } catch (err) {
+            console.error("Dashboard fetch error:", err);
+            window.location.href = "/login.html";
           }
-
-          summaryDiv.innerHTML = `
-            <div class="card">
-              <h3>Total Components: ${data.total_components}</h3>
-              <h3>Items Out: ${data.total_out}</h3>
-              <h3>Total Students: ${data.total_students}</h3>
-            </div>
-            ${lowStockHtml}
-          `;
         }
 
         window.onload = loadSummary;

@@ -10,6 +10,14 @@ if (process.env.NODE_ENV !== "production") {
   try { require("dotenv").config(); } catch (e) { /* dotenv optional in prod */ }
 }
 
+// Validate required environment variables
+if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) {
+  console.error("\n============================================");
+  console.error("ERROR: Missing required environment variables!");
+  console.error("Set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN");
+  console.error("============================================\n");
+}
+
 const app = express();
 
 // Trust Render's reverse proxy (required for sessions & secure cookies behind HTTPS)
@@ -70,7 +78,10 @@ class TursoStore extends session.Store {
       } else {
         callback(null, null);
       }
-    } catch (err) { callback(err); }
+    } catch (err) {
+      console.error("Session GET error:", err.message);
+      callback(err);
+    }
   }
   async set(sid, sessionData, callback) {
     try {
@@ -79,13 +90,19 @@ class TursoStore extends session.Store {
       const data = JSON.stringify(sessionData);
       await this.db.execute({ sql: "INSERT OR REPLACE INTO sessions (sid, data, expires) VALUES (?, ?, ?)", args: [sid, data, expires] });
       if (callback) callback(null);
-    } catch (err) { if (callback) callback(err); }
+    } catch (err) {
+      console.error("Session SET error:", err.message);
+      if (callback) callback(err);
+    }
   }
   async destroy(sid, callback) {
     try {
       await this.db.execute({ sql: "DELETE FROM sessions WHERE sid = ?", args: [sid] });
       if (callback) callback(null);
-    } catch (err) { if (callback) callback(err); }
+    } catch (err) {
+      console.error("Session DESTROY error:", err.message);
+      if (callback) callback(err);
+    }
   }
 }
 
@@ -176,13 +193,45 @@ async function initDatabase() {
   }
 }
 
-initDatabase().catch(err => console.error("DB init error:", err));
+// Database ready flag
+let dbReady = false;
+
+// Middleware to check DB readiness
+app.use((req, res, next) => {
+  if (!dbReady && req.path !== '/login.html' && req.path !== '/style.css' && req.path !== '/ennovate-logo.png' && !req.path.startsWith('/login')) {
+    // Allow static assets and login page even before DB is ready
+  }
+  next();
+});
+
+async function startApp() {
+  try {
+    await initDatabase();
+    dbReady = true;
+    console.log("Database initialized successfully");
+  } catch (err) {
+    console.error("CRITICAL: Database initialization failed:", err);
+    console.error("The app will start but database operations will fail.");
+    console.error("Check your TURSO_DATABASE_URL and TURSO_AUTH_TOKEN environment variables.");
+  }
+
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`ERP running on http://localhost:${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`Database ready: ${dbReady}`);
+  });
+}
 
 // ================= AUTH ROUTES =================
 
 app.post("/login", loginRateLimiter, async (req, res) => {
   const { username, password } = req.body;
   try {
+    if (!dbReady) {
+      console.error("Login attempt but database is not ready");
+      return res.status(503).json({ success: false, message: "Database not ready. Please try again in a moment." });
+    }
     const result = await db.execute({ sql: "SELECT * FROM admins WHERE username = ?", args: [username] });
     if (result.rows.length === 0) {
       const record = loginAttempts.get(req.ip) || { count: 0, lastAttempt: Date.now() };
@@ -200,10 +249,18 @@ app.post("/login", loginRateLimiter, async (req, res) => {
     }
     loginAttempts.delete(req.ip);
     req.session.admin = admin.id;
-    res.json({ success: true });
+    // Explicitly save the session before responding
+    req.session.save((err) => {
+      if (err) {
+        console.error("Session save error after login:", err);
+        return res.status(500).json({ success: false, message: "Session error. Please try again." });
+      }
+      console.log("Login successful for user:", username, "| Session ID:", req.sessionID);
+      res.json({ success: true });
+    });
   } catch (err) {
     console.error("Login error:", err);
-    res.json({ success: false, message: "Server error" });
+    res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
@@ -954,7 +1011,4 @@ app.get("/download-report-excel", requireAdmin, async (req, res) => {
 
 // ================= START SERVER =================
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`ERP running on http://localhost:${PORT}`);
-});
+startApp();
