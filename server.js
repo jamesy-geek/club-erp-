@@ -124,7 +124,7 @@ app.use(session({
   }
 }));
 
-app.use(express.static("public"));
+app.use(express.static(path.join(__dirname, "public")));
 
 // ================= AUTH MIDDLEWARE =================
 
@@ -196,10 +196,11 @@ async function initDatabase() {
 // Database ready flag
 let dbReady = false;
 
-// Middleware to check DB readiness
+// Middleware to check DB readiness — return 503 for API routes when DB isn't ready
 app.use((req, res, next) => {
-  if (!dbReady && req.path !== '/login.html' && req.path !== '/style.css' && req.path !== '/ennovate-logo.png' && !req.path.startsWith('/login')) {
-    // Allow static assets and login page even before DB is ready
+  const staticPaths = ['/login.html', '/style.css', '/ennovate-logo.png', '/favicon.ico'];
+  if (!dbReady && !staticPaths.includes(req.path) && !req.path.startsWith('/login') && req.path !== '/') {
+    return res.status(503).json({ message: "Database is still initializing. Please try again in a moment." });
   }
   next();
 });
@@ -312,32 +313,45 @@ app.post("/delete-admin", requireAdmin, async (req, res) => {
 
 // ================= PAGE ROUTES =================
 
+function safeSendFile(res, filePath) {
+  res.sendFile(filePath, (err) => {
+    if (err) {
+      console.error(`sendFile error for ${filePath}:`, err.message);
+      if (!res.headersSent) {
+        res.status(404).sendFile(path.join(__dirname, "public", "404.html"), (err2) => {
+          if (err2) res.status(404).send("Page not found");
+        });
+      }
+    }
+  });
+}
+
 app.get("/", requireAdmin, (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "dashboard.html"));
+  safeSendFile(res, path.join(__dirname, "public", "dashboard.html"));
 });
 
 app.get("/components-page", requireAdmin, (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "components.html"));
+  safeSendFile(res, path.join(__dirname, "public", "components.html"));
 });
 
 app.get("/issue-page", requireAdmin, (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "issue.html"));
+  safeSendFile(res, path.join(__dirname, "public", "issue.html"));
 });
 
 app.get("/transactions-page", requireAdmin, (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "transactions.html"));
+  safeSendFile(res, path.join(__dirname, "public", "transactions.html"));
 });
 
 app.get("/reports-page", requireAdmin, (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "reports.html"));
+  safeSendFile(res, path.join(__dirname, "public", "reports.html"));
 });
 
 app.get("/students-page", requireAdmin, (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "students.html"));
+  safeSendFile(res, path.join(__dirname, "public", "students.html"));
 });
 
 app.get("/student.html", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "student.html"));
+  safeSendFile(res, path.join(__dirname, "public", "student.html"));
 });
 
 // ================= COMPONENT ROUTES =================
@@ -654,8 +668,7 @@ app.get("/export-database-pdf", requireAdmin, async (req, res) => {
       ORDER BY issues.issue_timestamp DESC LIMIT 200
     `);
 
-    const PDFBackup = require("pdfkit-table");
-    const doc = new PDFBackup({ margin: 40, size: "A4" });
+    const doc = new PDFDocument({ margin: 40, size: "A4" });
 
     const filename = `club-erp-backup-${new Date().toISOString().slice(0, 10)}.pdf`;
     res.setHeader("Content-Type", "application/pdf");
