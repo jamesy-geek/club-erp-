@@ -28,23 +28,28 @@ app.set("trust proxy", 1);
 
 // ================= TURSO DATABASE =================
 
-// Initialize database client with safety check
+// Initialize database client with flexibility for different naming conventions
 let db;
 try {
-  if (!process.env.TURSO_DATABASE_URL) {
-    throw new Error("TURSO_DATABASE_URL is not defined");
+  const dbUrl = process.env.TURSO_DATABASE_URL || process.env.LIBSQL_DB_URL || process.env.DATABASE_URL;
+  const authToken = process.env.TURSO_AUTH_TOKEN || process.env.LIBSQL_AUTH_TOKEN;
+
+  if (!dbUrl) {
+    throw new Error("No database URL found (checked TURSO_DATABASE_URL, LIBSQL_DB_URL, and DATABASE_URL)");
   }
+  
   db = createClient({
-    url: process.env.TURSO_DATABASE_URL,
-    authToken: process.env.TURSO_AUTH_TOKEN,
+    url: dbUrl,
+    authToken: authToken,
   });
+  console.log("Database client created successfully");
 } catch (err) {
   console.error("Failed to create database client:", err.message);
-  // Create a mock db to prevent crashes, but it will error on use
   db = {
-    execute: () => { throw new Error("Database client not initialized. Check your environment variables."); }
+    execute: () => { throw new Error(`DB Error: ${err.message}. Ensure env variables are set in Vercel.`); }
   };
 }
+
 
 
 // ================= SECURITY MIDDLEWARE =================
@@ -246,14 +251,14 @@ module.exports = app;
 // ================= DEBUG ROUTE =================
 app.get("/debug-env", (req, res) => {
   res.json({
-    DATABASE_URL_PRESENT: !!process.env.TURSO_DATABASE_URL,
-    DATABASE_URL_START: process.env.TURSO_DATABASE_URL ? process.env.TURSO_DATABASE_URL.substring(0, 15) + "..." : "N/A",
-    AUTH_TOKEN_PRESENT: !!process.env.TURSO_AUTH_TOKEN,
+    DATABASE_URL_PRESENT: !!(process.env.TURSO_DATABASE_URL || process.env.LIBSQL_DB_URL || process.env.DATABASE_URL),
+    AUTH_TOKEN_PRESENT: !!(process.env.TURSO_AUTH_TOKEN || process.env.LIBSQL_AUTH_TOKEN),
     NODE_ENV: process.env.NODE_ENV,
     VERCEL: !!process.env.VERCEL,
     DB_READY_FLAG: dbReady
   });
 });
+
 
 
 // ================= AUTH ROUTES =================
