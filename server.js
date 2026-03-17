@@ -215,13 +215,8 @@ async function initDatabase() {
 let dbReady = false;
 
 // Middleware to check DB readiness — return 503 for API routes when DB isn't ready
-app.use((req, res, next) => {
-  const staticPaths = ['/login.html', '/style.css', '/ennovate-logo.png', '/favicon.ico'];
-  if (!dbReady && !staticPaths.includes(req.path) && !req.path.startsWith('/login') && req.path !== '/') {
-    return res.status(503).json({ message: "Database is still initializing. Please try again in a moment." });
-  }
-  next();
-});
+// Removed blocking middleware to allow better debugging on Vercel
+
 
 async function startApp() {
   try {
@@ -247,6 +242,19 @@ async function startApp() {
 
 // Export the app for Vercel
 module.exports = app;
+
+// ================= DEBUG ROUTE =================
+app.get("/debug-env", (req, res) => {
+  res.json({
+    DATABASE_URL_PRESENT: !!process.env.TURSO_DATABASE_URL,
+    DATABASE_URL_START: process.env.TURSO_DATABASE_URL ? process.env.TURSO_DATABASE_URL.substring(0, 15) + "..." : "N/A",
+    AUTH_TOKEN_PRESENT: !!process.env.TURSO_AUTH_TOKEN,
+    NODE_ENV: process.env.NODE_ENV,
+    VERCEL: !!process.env.VERCEL,
+    DB_READY_FLAG: dbReady
+  });
+});
+
 
 // ================= AUTH ROUTES =================
 
