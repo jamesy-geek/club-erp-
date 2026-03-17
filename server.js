@@ -206,7 +206,7 @@ async function initDatabase() {
   if (adminCheck.rows[0].count === 0) {
     const hashed = await bcrypt.hash("admin123", 10);
     await db.execute({ sql: "INSERT INTO admins (username, password) VALUES (?, ?)", args: ["admin", hashed] });
-    console.log("Default admin created → admin / admin123");
+    console.log("Default admin created → Admin / admin123");
   }
 }
 
