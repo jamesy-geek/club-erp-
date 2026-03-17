@@ -201,13 +201,14 @@ async function initDatabase() {
     FOREIGN KEY(component_id) REFERENCES components(id)
   )`);
 
-  // Create default admin if none exists
-  const adminCheck = await db.execute("SELECT COUNT(*) as count FROM admins");
-  if (adminCheck.rows[0].count === 0) {
-    const hashed = await bcrypt.hash("admin123", 10);
-    await db.execute({ sql: "INSERT INTO admins (username, password) VALUES (?, ?)", args: ["admin", hashed] });
-    console.log("Default admin created → Admin / admin123");
-  }
+  // Ensure default admin exists and reset password to 'admin123'
+  const hashed = await bcrypt.hash("admin123", 10);
+  await db.execute({ 
+    sql: "INSERT INTO admins (username, password) VALUES (?, ?) ON CONFLICT(username) DO UPDATE SET password = excluded.password", 
+    args: ["admin", hashed] 
+  });
+  console.log("Default admin updated/created → admin / admin123");
+
 }
 
 // Database ready flag
