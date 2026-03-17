@@ -257,21 +257,33 @@ app.post("/login", loginRateLimiter, async (req, res) => {
       console.error("Login attempt but database is not ready");
       return res.status(503).json({ success: false, message: "Database not ready. Please try again in a moment." });
     }
-    const result = await db.execute({ sql: "SELECT * FROM admins WHERE username = ?", args: [username] });
+    console.log(`Login attempt for username: "${username}"`);
+    
+    // Case-insensitive lookup for more reliability
+    const result = await db.execute({ 
+      sql: "SELECT * FROM admins WHERE LOWER(username) = LOWER(?)", 
+      args: [username] 
+    });
+
     if (result.rows.length === 0) {
+      console.warn(`Login failed: Username "${username}" not found in database.`);
       const record = loginAttempts.get(req.ip) || { count: 0, lastAttempt: Date.now() };
       record.count++; record.lastAttempt = Date.now();
       loginAttempts.set(req.ip, record);
       return res.json({ success: false });
     }
+
     const admin = result.rows[0];
     const match = await bcrypt.compare(password, admin.password);
+    
     if (!match) {
+      console.warn(`Login failed: Incorrect password for "${username}".`);
       const record = loginAttempts.get(req.ip) || { count: 0, lastAttempt: Date.now() };
       record.count++; record.lastAttempt = Date.now();
       loginAttempts.set(req.ip, record);
       return res.json({ success: false });
     }
+
     loginAttempts.delete(req.ip);
     req.session.admin = admin.id;
     // Explicitly save the session before responding
