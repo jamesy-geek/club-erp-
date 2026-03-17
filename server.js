@@ -878,7 +878,8 @@ app.post("/import-components", requireAdmin, upload.single("file"), async (req, 
 
 // ================= REPORT DOWNLOADS =================
 
-const PDFDocument = require("pdfkit-table");
+// PDFDocument is already required at the top
+
 
 app.get("/download-report-pdf", requireAdmin, async (req, res) => {
   const { usn, startDate, endDate } = req.query;
