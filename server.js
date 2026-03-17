@@ -4,6 +4,9 @@ const session = require("express-session");
 const bcrypt = require("bcryptjs");
 const path = require("path");
 const helmet = require("helmet");
+const PDFDocument = require("pdfkit-table");
+const ExcelJS = require("exceljs");
+
 
 // Load .env in development
 if (process.env.NODE_ENV !== "production") {
@@ -25,10 +28,24 @@ app.set("trust proxy", 1);
 
 // ================= TURSO DATABASE =================
 
-const db = createClient({
-  url: process.env.TURSO_DATABASE_URL,
-  authToken: process.env.TURSO_AUTH_TOKEN,
-});
+// Initialize database client with safety check
+let db;
+try {
+  if (!process.env.TURSO_DATABASE_URL) {
+    throw new Error("TURSO_DATABASE_URL is not defined");
+  }
+  db = createClient({
+    url: process.env.TURSO_DATABASE_URL,
+    authToken: process.env.TURSO_AUTH_TOKEN,
+  });
+} catch (err) {
+  console.error("Failed to create database client:", err.message);
+  // Create a mock db to prevent crashes, but it will error on use
+  db = {
+    execute: () => { throw new Error("Database client not initialized. Check your environment variables."); }
+  };
+}
+
 
 // ================= SECURITY MIDDLEWARE =================
 
@@ -674,7 +691,9 @@ app.get("/export-database-pdf", requireAdmin, async (req, res) => {
       ORDER BY issues.issue_timestamp DESC LIMIT 200
     `);
 
+    // PDFDocument is now required at the top of the file
     const doc = new PDFDocument({ margin: 40, size: "A4" });
+
 
     const filename = `club-erp-backup-${new Date().toISOString().slice(0, 10)}.pdf`;
     res.setHeader("Content-Type", "application/pdf");
@@ -777,8 +796,8 @@ app.post("/import-components", requireAdmin, upload.single("file"), async (req, 
     let parsed = [];
 
     if (ext === ".xlsx" || ext === ".csv") {
-      const ExcelJSImport = require("exceljs");
-      const workbook = new ExcelJSImport.Workbook();
+      const workbook = new ExcelJS.Workbook();
+
       if (ext === ".csv") {
         await workbook.csv.read(require("stream").Readable.from(req.file.buffer));
       } else {
@@ -959,7 +978,8 @@ app.get("/download-report-pdf", requireAdmin, async (req, res) => {
   doc.end();
 });
 
-const ExcelJS = require("exceljs");
+// ExcelJS is already required at the top
+
 
 app.get("/download-report-excel", requireAdmin, async (req, res) => {
   const { usn, startDate, endDate } = req.query;
