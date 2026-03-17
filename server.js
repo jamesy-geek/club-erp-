@@ -55,13 +55,8 @@ function loginRateLimiter(req, res, next) {
   next();
 }
 
-setInterval(() => {
-  const now = Date.now();
-  const windowMs = 15 * 60 * 1000;
-  for (const [ip, record] of loginAttempts) {
-    if (now - record.lastAttempt > windowMs) loginAttempts.delete(ip);
-  }
-}, 30 * 60 * 1000);
+// No setInterval in serverless environment
+
 
 // ================= CUSTOM SESSION STORE (Turso) =================
 
@@ -142,7 +137,8 @@ function requireAdmin(req, res, next) {
 async function initDatabase() {
   // Drop and recreate sessions table to fix schema mismatches
   // (sessions are transient — users just re-login)
-  await db.execute(`DROP TABLE IF EXISTS sessions`);
+  // Removed DROP TABLE IF EXISTS sessions to prevent logout on serverless cold starts
+
   await db.execute(`CREATE TABLE IF NOT EXISTS sessions (
     sid TEXT PRIMARY KEY,
     data TEXT,
@@ -221,12 +217,18 @@ async function startApp() {
   }
 
   const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => {
-    console.log(`ERP running on http://localhost:${PORT}`);
-    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`Database ready: ${dbReady}`);
-  });
+  // Only listen if not running in a serverless environment (Vercel)
+  if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
+    app.listen(PORT, () => {
+      console.log(`ERP running on http://localhost:${PORT}`);
+      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`Database ready: ${dbReady}`);
+    });
+  }
 }
+
+// Export the app for Vercel
+module.exports = app;
 
 // ================= AUTH ROUTES =================
 
