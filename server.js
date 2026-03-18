@@ -279,12 +279,13 @@ module.exports = app;
 app.get("/version", (req, res) => res.send(CURRENT_VERSION));
 
 
-const CURRENT_VERSION = "v1.2-refactored-init";
+const CURRENT_VERSION = "v1.3-detailed-login";
 
 // ================= DEBUG ROUTE =================
 app.get("/debug-env", (req, res) => {
   res.json({
     VERSION: CURRENT_VERSION,
+
 
     DATABASE_URL_PRESENT: !!(process.env.TURSO_DATABASE_URL || process.env.LIBSQL_DB_URL || process.env.DATABASE_URL),
     AUTH_TOKEN_PRESENT: !!(process.env.TURSO_AUTH_TOKEN || process.env.LIBSQL_AUTH_TOKEN),
@@ -316,7 +317,7 @@ app.post("/login", loginRateLimiter, async (req, res) => {
       const record = loginAttempts.get(req.ip) || { count: 0, lastAttempt: Date.now() };
       record.count++; record.lastAttempt = Date.now();
       loginAttempts.set(req.ip, record);
-      return res.json({ success: false });
+      return res.json({ success: false, message: "Username not found in database" });
     }
 
     const admin = result.rows[0];
@@ -327,8 +328,9 @@ app.post("/login", loginRateLimiter, async (req, res) => {
       const record = loginAttempts.get(req.ip) || { count: 0, lastAttempt: Date.now() };
       record.count++; record.lastAttempt = Date.now();
       loginAttempts.set(req.ip, record);
-      return res.json({ success: false });
+      return res.json({ success: false, message: "Incorrect password" });
     }
+
 
     loginAttempts.delete(req.ip);
     req.session.admin = admin.id;
