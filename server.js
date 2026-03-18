@@ -218,39 +218,74 @@ async function initDatabase() {
 
 // Database ready flag
 let dbReady = false;
+let dbInitializationPromise = null;
 
-// Middleware to check DB readiness — return 503 for API routes when DB isn't ready
-// Removed blocking middleware to allow better debugging on Vercel
+async function ensureDbInitialized() {
+  if (dbReady) return true;
+  if (dbInitializationPromise) return dbInitializationPromise;
+  
+  dbInitializationPromise = (async () => {
+    try {
+      console.log("Starting database initialization...");
+      await initDatabase();
+      dbReady = true;
+      console.log("Database initialized successfully");
+      return true;
+    } catch (err) {
+      console.error("CRITICAL: Database initialization failed:", err.message);
+      dbInitializationPromise = null; // Allow retry on next request
+      throw err;
+    }
+  })();
+  
+  return dbInitializationPromise;
+}
 
+// Middleware to ensure DB is ready before any route
+app.use(async (req, res, next) => {
+  // Allow these paths without DB
+  const staticPaths = ['/login.html', '/style.css', '/ennovate-logo.png', '/favicon.ico', '/debug-env'];
+  if (staticPaths.includes(req.path)) return next();
+
+  try {
+    await ensureDbInitialized();
+    next();
+  } catch (err) {
+    console.error("Request failed due to DB error:", err.message);
+    res.status(500).json({ 
+      success: false, 
+      message: "Database connection failed. Check your Turso console and environment variables.",
+      error: err.message 
+    });
+  }
+});
 
 async function startApp() {
-  try {
-    await initDatabase();
-    dbReady = true;
-    console.log("Database initialized successfully");
-  } catch (err) {
-    console.error("CRITICAL: Database initialization failed:", err);
-    console.error("The app will start but database operations will fail.");
-    console.error("Check your TURSO_DATABASE_URL and TURSO_AUTH_TOKEN environment variables.");
-  }
+
 
   const PORT = process.env.PORT || 3000;
   // Only listen if not running in a serverless environment (Vercel)
-  if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
+  if (!process.env.VERCEL) {
     app.listen(PORT, () => {
       console.log(`ERP running on http://localhost:${PORT}`);
-      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`Database ready: ${dbReady}`);
     });
   }
 }
 
+
 // Export the app for Vercel
 module.exports = app;
+
+app.get("/version", (req, res) => res.send(CURRENT_VERSION));
+
+
+const CURRENT_VERSION = "v1.2-refactored-init";
 
 // ================= DEBUG ROUTE =================
 app.get("/debug-env", (req, res) => {
   res.json({
+    VERSION: CURRENT_VERSION,
+
     DATABASE_URL_PRESENT: !!(process.env.TURSO_DATABASE_URL || process.env.LIBSQL_DB_URL || process.env.DATABASE_URL),
     AUTH_TOKEN_PRESENT: !!(process.env.TURSO_AUTH_TOKEN || process.env.LIBSQL_AUTH_TOKEN),
     NODE_ENV: process.env.NODE_ENV,
@@ -266,10 +301,8 @@ app.get("/debug-env", (req, res) => {
 app.post("/login", loginRateLimiter, async (req, res) => {
   const { username, password } = req.body;
   try {
-    if (!dbReady) {
-      console.error("Login attempt but database is not ready");
-      return res.status(503).json({ success: false, message: "Database not ready. Please try again in a moment." });
-    }
+    // No more manual dbReady check here, handled by middleware
+
     console.log(`Login attempt for username: "${username}"`);
     
     // Case-insensitive lookup for more reliability
