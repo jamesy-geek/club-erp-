@@ -34,8 +34,9 @@
 
     async function login() {
 
-      const username = document.querySelector("input[placeholder='Username']").value;
-      const password = document.querySelector("input[placeholder='Password']").value;
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value.trim();
+
 
       const res = await fetch("/login", {
         method: "POST",
@@ -49,9 +50,10 @@
       if (data.success) {
         window.location.href = "/dashboard.html";
       } else {
-        alert("Invalid credentials");
+        alert(data.message || "Invalid credentials");
       }
     }
+
   </script>
 
   <script>
