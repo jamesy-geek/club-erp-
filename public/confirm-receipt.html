@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Confirm Receipt — CERP</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+  <div class="layout" style="justify-content:center;align-items:center; min-height:100vh;">
+    <div style="text-align:center; max-width:440px; padding:20px;">
+      <img src="/ennovate-logo.png" alt=".ennovate" style="width:120px; margin-bottom:12px; opacity:0.85;">
+
+      <div class="card" id="resultCard" style="text-align:center;">
+        <div id="loadingState">
+          <div style="font-size:40px; margin-bottom:12px;">⏳</div>
+          <h2 style="color:#334155;">Confirming Receipt...</h2>
+          <p style="color:#64748b; font-size:14px;">Please wait while we process your confirmation.</p>
+        </div>
+
+        <div id="successState" style="display:none;">
+          <div style="font-size:48px; margin-bottom:12px;">✅</div>
+          <h2 style="color:#16a34a;">Receipt Confirmed!</h2>
+          <p style="color:#64748b; font-size:14px;">Thank you for confirming. Your transaction record has been updated.</p>
+        </div>
+
+        <div id="alreadyState" style="display:none;">
+          <div style="font-size:48px; margin-bottom:12px;">ℹ️</div>
+          <h2 style="color:#2563eb;">Already Confirmed</h2>
+          <p style="color:#64748b; font-size:14px;">This receipt has already been confirmed. No further action is needed.</p>
+        </div>
+
+        <div id="errorState" style="display:none;">
+          <div style="font-size:48px; margin-bottom:12px;">❌</div>
+          <h2 style="color:#dc2626;">Confirmation Failed</h2>
+          <p id="errorMessage" style="color:#64748b; font-size:14px;"></p>
+        </div>
+      </div>
+
+      <p style="color:#94a3b8; font-size:11px; margin-top:16px;">CERP — Club Ennovate Resource Portal</p>
+    </div>
+  </div>
+
+  <script>
+    async function confirmReceipt() {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get("token");
+
+      if (!token) {
+        showError("No confirmation token found in the URL.");
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/confirm-receipt?token=${encodeURIComponent(token)}`);
+        const data = await res.json();
+
+        document.getElementById("loadingState").style.display = "none";
+
+        if (data.success && data.already_confirmed) {
+          document.getElementById("alreadyState").style.display = "block";
+        } else if (data.success) {
+          document.getElementById("successState").style.display = "block";
+        } else {
+          showError(data.message || "An error occurred.");
+        }
+      } catch (err) {
+        showError("Connection error. Please try again later.");
+      }
+    }
+
+    function showError(message) {
+      document.getElementById("loadingState").style.display = "none";
+      document.getElementById("errorMessage").textContent = message;
+      document.getElementById("errorState").style.display = "block";
+    }
+
+    window.onload = confirmReceipt;
+  </script>
+
+</body>
+</html>

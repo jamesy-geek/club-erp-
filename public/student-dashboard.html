@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Student Dashboard — CERP</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+  <div class="menu-toggle" onclick="toggleMenu()">☰ Menu</div>
+
+  <div class="layout">
+
+    <div class="sidebar student-sidebar" id="sidebar">
+      <h2><img src="/ennovate-logo.png" alt=""> CERP</h2>
+      <a href="/student-dashboard" class="active">Dashboard</a>
+      <a href="/student-catalog">Catalog</a>
+      <a href="/student-requests-page">My Requests</a>
+      <hr>
+      <a href="#" onclick="logout()">Logout</a>
+      <div class="sidebar-footer">
+        <img src="/ennovate-logo.png" alt="">
+        <span>Student Portal</span>
+      </div>
+    </div>
+
+    <div class="content">
+      <h1>Dashboard</h1>
+      <p style="color:#64748b; margin-top:-16px; margin-bottom:20px; font-size:15px;">
+        Welcome, <strong id="studentName">Student</strong>
+        <span style="margin-left:8px; font-size:12px; color:#94a3b8;" id="studentUSN"></span>
+      </p>
+
+      <!-- Quick Request CTA -->
+      <div style="margin-bottom: 24px;">
+        <a href="/student-catalog" style="text-decoration:none;">
+          <button style="background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%); font-size: 15px; padding: 14px 28px;">
+            📦 Browse & Request Components
+          </button>
+        </a>
+      </div>
+
+      <!-- Active Borrows -->
+      <div class="card" id="borrowsCard" style="border-left: 4px solid #2563eb;">
+        <h3 style="margin-top:0;">📋 Active Borrows</h3>
+        <div id="borrowsList">
+          <p style="color:#94a3b8; font-size:13px;">Loading...</p>
+        </div>
+      </div>
+
+      <!-- Pending Requests -->
+      <div class="card" id="pendingCard" style="border-left: 4px solid #f59e0b;">
+        <h3 style="margin-top:0;">⏳ Pending Requests</h3>
+        <div id="pendingList">
+          <p style="color:#94a3b8; font-size:13px;">Loading...</p>
+        </div>
+      </div>
+
+      <!-- Recent History -->
+      <div class="card" id="historyCard">
+        <h3 style="margin-top:0;">📜 Request History</h3>
+        <div id="historyList">
+          <p style="color:#94a3b8; font-size:13px;">Loading...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    function toggleMenu() {
+      document.getElementById("sidebar").classList.toggle("active");
+    }
+
+    function showToast(message, success = true) {
+      const toast = document.getElementById("toast");
+      toast.style.background = success ? "#16a34a" : "#dc2626";
+      toast.innerText = message;
+      toast.style.display = "block";
+      setTimeout(() => toast.style.display = "none", 2500);
+    }
+
+    async function logout() {
+      await fetch("/student-logout", { method: "POST" });
+      window.location.href = "/student-login.html";
+    }
+
+    function statusBadge(status) {
+      const colors = {
+        PENDING: 'background:#f59e0b;color:#fff',
+        APPROVED: 'background:#16a34a;color:#fff',
+        REJECTED: 'background:#dc2626;color:#fff',
+        WITHDRAWN: 'background:#64748b;color:#fff',
+        CONFIRMED: 'background:#0891b2;color:#fff',
+        COMPLETED: 'background:#334155;color:#fff',
+        EXPIRED: 'background:#94a3b8;color:#fff',
+        DRAFT: 'background:#e2e8f0;color:#334155'
+      };
+      return `<span class="badge" style="${colors[status] || 'background:#e2e8f0;color:#334155'}">${status}</span>`;
+    }
+
+    async function loadDashboard() {
+      // Load student info
+      try {
+        const sRes = await fetch("/student-session", { credentials: "same-origin" });
+        if (sRes.status === 401) { window.location.href = "/student-login.html"; return; }
+        const student = await sRes.json();
+        document.getElementById("studentName").textContent = student.student_name;
+        document.getElementById("studentUSN").textContent = student.usn;
+      } catch (e) { window.location.href = "/student-login.html"; return; }
+
+      // Load dashboard data
+      try {
+        const res = await fetch("/api/student/dashboard", { credentials: "same-origin" });
+        if (res.status === 401) { window.location.href = "/student-login.html"; return; }
+        const data = await res.json();
+
+        // Borrows
+        const borrowsDiv = document.getElementById("borrowsList");
+        if (data.borrows.length === 0) {
+          borrowsDiv.innerHTML = '<p style="color:#94a3b8; font-size:13px;">No active borrows</p>';
+        } else {
+          borrowsDiv.innerHTML = data.borrows.map(b => `
+            <div style="background:#f8fafc; padding:12px; border-radius:8px; margin-bottom:8px;">
+              <strong>${b.component_name}</strong>
+              <span style="float:right; font-weight:600; color:#2563eb;">${b.remaining} remaining</span>
+              <br><span style="font-size:12px; color:#64748b;">Issued: ${b.quantity} | Returned: ${b.returned_quantity}</span>
+            </div>
+          `).join('');
+        }
+
+        // Pending
+        const pendingDiv = document.getElementById("pendingList");
+        if (data.pending.length === 0) {
+          pendingDiv.innerHTML = '<p style="color:#94a3b8; font-size:13px;">No pending requests</p>';
+        } else {
+          pendingDiv.innerHTML = data.pending.map(p => `
+            <div style="background:#fffbeb; padding:12px; border-radius:8px; margin-bottom:8px; border-left:3px solid #f59e0b;">
+              <strong>${p.component_name}</strong> × ${p.quantity}
+              ${statusBadge(p.status)}
+              ${p.purpose_note ? `<br><span style="font-size:12px; color:#64748b;">Note: ${p.purpose_note}</span>` : ''}
+              <br><span style="font-size:11px; color:#94a3b8;">${new Date(p.created_at).toLocaleString()}</span>
+            </div>
+          `).join('');
+        }
+
+        // History
+        const historyDiv = document.getElementById("historyList");
+        if (data.history.length === 0) {
+          historyDiv.innerHTML = '<p style="color:#94a3b8; font-size:13px;">No request history yet</p>';
+        } else {
+          historyDiv.innerHTML = data.history.map(h => `
+            <div style="background:#f8fafc; padding:12px; border-radius:8px; margin-bottom:8px;">
+              <strong>${h.component_name}</strong> × ${h.quantity}
+              ${statusBadge(h.status)}
+              ${h.rejection_reason ? `<br><span style="font-size:12px; color:#dc2626;">Reason: ${h.rejection_reason}</span>` : ''}
+              <br><span style="font-size:11px; color:#94a3b8;">${new Date(h.created_at).toLocaleString()}</span>
+            </div>
+          `).join('');
+        }
+      } catch (err) {
+        console.error("Dashboard error:", err);
+      }
+    }
+
+    window.onload = loadDashboard;
+  </script>
+
+</body>
+</html>

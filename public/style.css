@@ -568,3 +568,33 @@ tbody tr:hover {
   background: #64748b;
   color: white;
 }
+
+/* ================= STUDENT SIDEBAR ================= */
+
+.student-sidebar {
+  background: linear-gradient(180deg, #1e1b4b 0%, #312e81 100%);
+}
+
+.student-sidebar a:hover,
+.student-sidebar a.active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* ================= STATUS BADGES ================= */
+
+.badge-pending { background: #f59e0b; color: #fff; }
+.badge-approved { background: #16a34a; color: #fff; }
+.badge-rejected { background: #dc2626; color: #fff; }
+.badge-withdrawn { background: #64748b; color: #fff; }
+.badge-confirmed { background: #0891b2; color: #fff; }
+.badge-completed { background: #334155; color: #fff; }
+.badge-expired { background: #94a3b8; color: #fff; }
+.badge-draft { background: #e2e8f0; color: #334155; }
+
+/* ================= CATALOG GRID ================= */
+
+@media (max-width: 768px) {
+  #catalogGrid {
+    grid-template-columns: 1fr !important;
+  }
+}

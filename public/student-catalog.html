@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Component Catalog — CERP</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+  <div class="menu-toggle" onclick="toggleMenu()">☰ Menu</div>
+
+  <div class="layout">
+
+    <div class="sidebar student-sidebar" id="sidebar">
+      <h2><img src="/ennovate-logo.png" alt=""> CERP</h2>
+      <a href="/student-dashboard">Dashboard</a>
+      <a href="/student-catalog" class="active">Catalog</a>
+      <a href="/student-requests-page">My Requests</a>
+      <hr>
+      <a href="#" onclick="logout()">Logout</a>
+      <div class="sidebar-footer">
+        <img src="/ennovate-logo.png" alt="">
+        <span>Student Portal</span>
+      </div>
+    </div>
+
+    <div class="content">
+      <h1>Component Catalog</h1>
+      <p style="color:#64748b; margin-top:-16px; margin-bottom:20px; font-size:14px;">Browse available components and submit requests</p>
+
+      <div class="card">
+        <input type="text" id="searchInput" placeholder="🔍 Search components..." onkeyup="filterCatalog()" style="margin-bottom:0;">
+      </div>
+
+      <div id="catalogGrid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+      </div>
+    </div>
+  </div>
+
+  <!-- Request Modal -->
+  <div class="modal-overlay" id="requestModal">
+    <div class="modal-box">
+      <h2>📦 Request Component</h2>
+      <input type="hidden" id="reqComponentId">
+
+      <label>Component</label>
+      <input id="reqComponentName" readonly style="background:#f1f5f9; font-weight:600;">
+
+      <label>Available Stock</label>
+      <input id="reqAvailable" readonly style="background:#f1f5f9;">
+
+      <label>Quantity</label>
+      <input id="reqQuantity" type="number" min="1" placeholder="Enter quantity">
+
+      <label>Purpose / Note (optional)</label>
+      <textarea id="reqNote" rows="3" placeholder="e.g., For project, hackathon submission..." style="resize:vertical;"></textarea>
+
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeRequestModal()">Cancel</button>
+        <button onclick="submitRequest()" style="background: #4f46e5;">Submit Request</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    let allComponents = [];
+
+    function toggleMenu() {
+      document.getElementById("sidebar").classList.toggle("active");
+    }
+
+    function showToast(message, success = true) {
+      const toast = document.getElementById("toast");
+      toast.style.background = success ? "#16a34a" : "#dc2626";
+      toast.innerText = message;
+      toast.style.display = "block";
+      setTimeout(() => toast.style.display = "none", 2500);
+    }
+
+    async function logout() {
+      await fetch("/student-logout", { method: "POST" });
+      window.location.href = "/student-login.html";
+    }
+
+    async function loadCatalog() {
+      try {
+        const res = await fetch("/api/student/catalog", { credentials: "same-origin" });
+        if (res.status === 401) { window.location.href = "/student-login.html"; return; }
+        allComponents = await res.json();
+        renderCatalog(allComponents);
+      } catch (err) {
+        console.error("Catalog error:", err);
+      }
+    }
+
+    function filterCatalog() {
+      const query = document.getElementById("searchInput").value.toLowerCase();
+      const filtered = allComponents.filter(c => c.name.toLowerCase().includes(query));
+      renderCatalog(filtered);
+    }
+
+    function renderCatalog(components) {
+      const grid = document.getElementById("catalogGrid");
+      if (components.length === 0) {
+        grid.innerHTML = '<div class="card"><p style="color:#94a3b8;">No components found</p></div>';
+        return;
+      }
+      grid.innerHTML = components.map(c => {
+        const inStock = c.available_quantity > 0;
+        const stockColor = inStock ? '#16a34a' : '#94a3b8';
+        const stockLabel = inStock ? `${c.available_quantity} Available` : 'Out of Stock';
+        return `
+          <div class="card" style="display:flex; flex-direction:column; justify-content:space-between;">
+            <div>
+              ${c.photo1 ? `<img src="${c.photo1}" style="width:100%; height:120px; object-fit:cover; border-radius:8px; margin-bottom:12px;">` : ''}
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <strong style="font-size:15px;">${c.name}</strong>
+                <span class="badge" style="background:${stockColor};color:#fff; font-size:11px;">${stockLabel}</span>
+              </div>
+              <p style="color:#64748b; font-size:13px; margin:0;">Total: ${c.total_quantity} | Available: ${c.available_quantity}</p>
+            </div>
+            <button onclick="openRequestModal(${c.id}, '${c.name.replace(/'/g, "\\'")}', ${c.available_quantity})" style="margin-top:14px; background: ${inStock ? '#4f46e5' : '#94a3b8'}; width:100%; justify-content:center;">
+              ${inStock ? '📨 Request' : '📨 Request (Out of Stock)'}
+            </button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openRequestModal(componentId, componentName, available) {
+      document.getElementById("reqComponentId").value = componentId;
+      document.getElementById("reqComponentName").value = componentName;
+      document.getElementById("reqAvailable").value = available + " units";
+      document.getElementById("reqQuantity").value = "";
+      document.getElementById("reqQuantity").max = available;
+      document.getElementById("reqNote").value = "";
+      document.getElementById("requestModal").classList.add("active");
+    }
+
+    function closeRequestModal() {
+      document.getElementById("requestModal").classList.remove("active");
+    }
+
+    document.getElementById("requestModal").addEventListener("click", function(e) {
+      if (e.target === this) closeRequestModal();
+    });
+
+    async function submitRequest() {
+      const component_id = parseInt(document.getElementById("reqComponentId").value);
+      const quantity = parseInt(document.getElementById("reqQuantity").value);
+      const purpose_note = document.getElementById("reqNote").value.trim();
+
+      if (!quantity || quantity < 1) {
+        showToast("Enter a valid quantity", false);
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/student/request", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ component_id, quantity, purpose_note })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          showToast("Request submitted! ✅");
+          closeRequestModal();
+          loadCatalog();
+        } else {
+          showToast(data.message, false);
+        }
+      } catch (err) {
+        showToast("Error submitting request", false);
+      }
+    }
+
+    window.onload = loadCatalog;
+  </script>
+
+</body>
+</html>

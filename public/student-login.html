@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Student Login — CERP</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+  <div class="layout" style="justify-content:center;align-items:center;">
+    <div style="text-align: center;">
+      <img src="/ennovate-logo.png" alt=".ennovate" style="width: 140px; margin-bottom: 8px; opacity: 0.85;">
+      <p style="color: #64748b; font-size: 12px; margin-bottom: 24px; letter-spacing: 0.5px;">Student Portal</p>
+
+      <div class="card" style="width:340px; text-align: left;">
+        <h2 style="text-align: center; margin-bottom: 6px;">Student Login</h2>
+        <p style="text-align: center; color: #94a3b8; font-size: 12px; margin-bottom: 18px;">Sign in with your student account</p>
+
+        <label>Email</label>
+        <input id="email" type="email" placeholder="your.email@example.com">
+
+        <label>Password</label>
+        <div class="password-wrapper" style="position: relative;">
+          <input id="password" type="password" placeholder="Password" style="padding-right: 40px;">
+          <span id="togglePassword" onclick="togglePasswordVisibility()" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; opacity: 0.5; font-size: 18px; user-select: none;">👁️</span>
+        </div>
+
+        <div id="errorMsg" style="color: #dc2626; font-size: 13px; margin-top: 8px; display: none;"></div>
+
+        <button onclick="studentLogin()" style="width: 100%; justify-content: center; margin-top: 12px;">Sign In</button>
+      </div>
+
+      <p style="margin-top: 16px;">
+        <a href="/login.html" style="color: #64748b; font-size: 13px; text-decoration: none;">Admin Login →</a>
+      </p>
+      <p style="color: #94a3b8; font-size: 10px; margin-top: 8px;">Built by Jishnu Abbhay D</p>
+    </div>
+  </div>
+
+  <script>
+    function togglePasswordVisibility() {
+      const passwordInput = document.getElementById("password");
+      const toggleIcon = document.getElementById("togglePassword");
+      if (passwordInput.type === "password") {
+        passwordInput.type = "text";
+        toggleIcon.textContent = "🙈";
+      } else {
+        passwordInput.type = "password";
+        toggleIcon.textContent = "👁️";
+      }
+    }
+
+    // Allow enter key
+    document.getElementById("password").addEventListener("keydown", e => { if (e.key === "Enter") studentLogin(); });
+    document.getElementById("email").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("password").focus(); });
+
+    async function studentLogin() {
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value.trim();
+      const errorDiv = document.getElementById("errorMsg");
+
+      if (!email || !password) {
+        errorDiv.textContent = "Please enter email and password";
+        errorDiv.style.display = "block";
+        return;
+      }
+
+      try {
+        const res = await fetch("/student-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          window.location.href = "/student-dashboard";
+        } else {
+          errorDiv.textContent = data.message || "Invalid credentials";
+          errorDiv.style.display = "block";
+        }
+      } catch (err) {
+        errorDiv.textContent = "Connection error. Please try again.";
+        errorDiv.style.display = "block";
+      }
+    }
+  </script>
+
+</body>
+</html>

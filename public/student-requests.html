@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>My Requests — CERP</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+  <div class="menu-toggle" onclick="toggleMenu()">☰ Menu</div>
+
+  <div class="layout">
+
+    <div class="sidebar student-sidebar" id="sidebar">
+      <h2><img src="/ennovate-logo.png" alt=""> CERP</h2>
+      <a href="/student-dashboard">Dashboard</a>
+      <a href="/student-catalog">Catalog</a>
+      <a href="/student-requests-page" class="active">My Requests</a>
+      <hr>
+      <a href="#" onclick="logout()">Logout</a>
+      <div class="sidebar-footer">
+        <img src="/ennovate-logo.png" alt="">
+        <span>Student Portal</span>
+      </div>
+    </div>
+
+    <div class="content">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px;">
+        <div>
+          <h1 style="margin-bottom:4px;">My Requests</h1>
+          <p style="color:#64748b; font-size:14px; margin:0;">View and manage your component requests</p>
+        </div>
+        <a href="/student-catalog" style="text-decoration:none;">
+          <button style="background:#4f46e5;">+ New Request</button>
+        </a>
+      </div>
+
+      <!-- Filter tabs -->
+      <div style="display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap;">
+        <button onclick="setFilter('ALL')" id="filterAll" class="btn-sm" style="background:#0f172a;">All</button>
+        <button onclick="setFilter('PENDING')" id="filterPending" class="btn-sm" style="background:#f59e0b;">Pending</button>
+        <button onclick="setFilter('APPROVED')" id="filterApproved" class="btn-sm" style="background:#16a34a;">Approved</button>
+        <button onclick="setFilter('REJECTED')" id="filterRejected" class="btn-sm" style="background:#dc2626;">Rejected</button>
+        <button onclick="setFilter('WITHDRAWN')" id="filterWithdrawn" class="btn-sm" style="background:#64748b;">Withdrawn</button>
+      </div>
+
+      <div id="requestsList"></div>
+    </div>
+  </div>
+
+  <!-- Edit Modal -->
+  <div class="modal-overlay" id="editModal">
+    <div class="modal-box">
+      <h2>Edit Request</h2>
+      <input type="hidden" id="editReqId">
+
+      <label>Component</label>
+      <input id="editComponent" readonly style="background:#f1f5f9; font-weight:600;">
+
+      <label>Quantity</label>
+      <input id="editQuantity" type="number" min="1">
+
+      <label>Purpose / Note</label>
+      <textarea id="editNote" rows="3" style="resize:vertical;"></textarea>
+
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeEditModal()">Cancel</button>
+        <button onclick="saveEdit()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    let allRequests = [];
+    let currentFilter = 'ALL';
+
+    function toggleMenu() {
+      document.getElementById("sidebar").classList.toggle("active");
+    }
+
+    function showToast(message, success = true) {
+      const toast = document.getElementById("toast");
+      toast.style.background = success ? "#16a34a" : "#dc2626";
+      toast.innerText = message;
+      toast.style.display = "block";
+      setTimeout(() => toast.style.display = "none", 2500);
+    }
+
+    async function logout() {
+      await fetch("/student-logout", { method: "POST" });
+      window.location.href = "/student-login.html";
+    }
+
+    function statusBadge(status) {
+      const colors = {
+        PENDING: 'background:#f59e0b;color:#fff',
+        APPROVED: 'background:#16a34a;color:#fff',
+        REJECTED: 'background:#dc2626;color:#fff',
+        WITHDRAWN: 'background:#64748b;color:#fff',
+        CONFIRMED: 'background:#0891b2;color:#fff',
+        COMPLETED: 'background:#334155;color:#fff',
+        EXPIRED: 'background:#94a3b8;color:#fff',
+        DRAFT: 'background:#e2e8f0;color:#334155'
+      };
+      return `<span class="badge" style="${colors[status] || 'background:#e2e8f0;color:#334155'}">${status}</span>`;
+    }
+
+    function setFilter(filter) {
+      currentFilter = filter;
+      renderRequests();
+    }
+
+    async function loadRequests() {
+      try {
+        const res = await fetch("/api/student/requests", { credentials: "same-origin" });
+        if (res.status === 401) { window.location.href = "/student-login.html"; return; }
+        allRequests = await res.json();
+        renderRequests();
+      } catch (err) {
+        console.error("Load requests error:", err);
+      }
+    }
+
+    function renderRequests() {
+      const filtered = currentFilter === 'ALL' ? allRequests : allRequests.filter(r => r.status === currentFilter);
+      const container = document.getElementById("requestsList");
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<div class="card"><p style="color:#94a3b8;">No requests found</p></div>';
+        return;
+      }
+
+      container.innerHTML = filtered.map(r => {
+        const canEdit = r.status === 'PENDING' || r.status === 'DRAFT';
+        const borderColor = { PENDING: '#f59e0b', APPROVED: '#16a34a', REJECTED: '#dc2626', WITHDRAWN: '#64748b', CONFIRMED: '#0891b2' }[r.status] || '#e2e8f0';
+
+        return `
+          <div class="card" style="border-left: 4px solid ${borderColor};">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+              <div>
+                <strong style="font-size:15px;">${r.component_name}</strong> × ${r.quantity}
+                ${statusBadge(r.status)}
+              </div>
+              <span style="font-size:12px; color:#94a3b8;">${new Date(r.created_at).toLocaleString()}</span>
+            </div>
+            ${r.purpose_note ? `<p style="color:#64748b; font-size:13px; margin:8px 0 0;">📝 ${r.purpose_note}</p>` : ''}
+            ${r.rejection_reason ? `<p style="color:#dc2626; font-size:13px; margin:8px 0 0;">❌ Reason: ${r.rejection_reason}</p>` : ''}
+            ${r.confirmed_at ? `<p style="color:#0891b2; font-size:12px; margin:8px 0 0;">✅ Confirmed: ${new Date(r.confirmed_at).toLocaleString()}</p>` : ''}
+            ${canEdit ? `
+              <div style="margin-top:12px; display:flex; gap:8px;">
+                <button class="btn-sm btn-edit" onclick="openEditModal(${r.id}, '${r.component_name.replace(/'/g, "\\'")}', ${r.quantity}, '${(r.purpose_note || '').replace(/'/g, "\\'")}')">✏️ Edit</button>
+                <button class="btn-sm btn-delete" onclick="withdrawRequest(${r.id})">🚫 Withdraw</button>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openEditModal(id, componentName, quantity, note) {
+      document.getElementById("editReqId").value = id;
+      document.getElementById("editComponent").value = componentName;
+      document.getElementById("editQuantity").value = quantity;
+      document.getElementById("editNote").value = note;
+      document.getElementById("editModal").classList.add("active");
+    }
+
+    function closeEditModal() {
+      document.getElementById("editModal").classList.remove("active");
+    }
+
+    document.getElementById("editModal").addEventListener("click", function(e) {
+      if (e.target === this) closeEditModal();
+    });
+
+    async function saveEdit() {
+      const id = document.getElementById("editReqId").value;
+      const quantity = parseInt(document.getElementById("editQuantity").value);
+      const purpose_note = document.getElementById("editNote").value.trim();
+
+      if (!quantity || quantity < 1) {
+        showToast("Enter a valid quantity", false);
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/student/request/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ quantity, purpose_note })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          showToast("Request updated");
+          closeEditModal();
+          loadRequests();
+        } else {
+          showToast(data.message, false);
+        }
+      } catch (err) {
+        showToast("Error updating request", false);
+      }
+    }
+
+    async function withdrawRequest(id) {
+      if (!confirm("Are you sure you want to withdraw this request?")) return;
+
+      try {
+        const res = await fetch(`/api/student/request/${id}/withdraw`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" }
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          showToast("Request withdrawn");
+          loadRequests();
+        } else {
+          showToast(data.message, false);
+        }
+      } catch (err) {
+        showToast("Error withdrawing request", false);
+      }
+    }
+
+    window.onload = loadRequests;
+  </script>
+
+</body>
+</html>

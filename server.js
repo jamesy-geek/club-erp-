@@ -6,6 +6,8 @@ const path = require("path");
 const helmet = require("helmet");
 const PDFDocument = require("pdfkit-table");
 const ExcelJS = require("exceljs");
+const crypto = require("crypto");
+const nodemailer = require("nodemailer");
 
 
 // Load .env in development
@@ -154,6 +156,14 @@ function requireAdmin(req, res, next) {
   }
 }
 
+function requireStudent(req, res, next) {
+  if (req.session && req.session.student_id) {
+    next();
+  } else {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+}
+
 // ================= DATABASE SETUP =================
 
 async function initDatabase() {
@@ -189,12 +199,20 @@ async function initDatabase() {
     phone TEXT
   )`);
 
+  // Add email and password columns to students if they don't exist
+  try { await db.execute(`ALTER TABLE students ADD COLUMN email TEXT`); } catch(e) { /* column exists */ }
+  try { await db.execute(`ALTER TABLE students ADD COLUMN password TEXT`); } catch(e) { /* column exists */ }
+
   await db.execute(`CREATE TABLE IF NOT EXISTS issues (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     student_id INTEGER,
     issue_timestamp DATETIME DEFAULT (datetime('now', '+5 hours', '+30 minutes')),
+    request_id INTEGER,
     FOREIGN KEY(student_id) REFERENCES students(id)
   )`);
+
+  // Add request_id column to issues if it doesn't exist
+  try { await db.execute(`ALTER TABLE issues ADD COLUMN request_id INTEGER`); } catch(e) { /* column exists */ }
 
   await db.execute(`CREATE TABLE IF NOT EXISTS issue_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -203,6 +221,28 @@ async function initDatabase() {
     quantity INTEGER,
     returned_quantity INTEGER DEFAULT 0,
     FOREIGN KEY(issue_id) REFERENCES issues(id),
+    FOREIGN KEY(component_id) REFERENCES components(id)
+  )`);
+
+  // Component requests table (Student Request Portal)
+  await db.execute(`CREATE TABLE IF NOT EXISTS component_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    student_id INTEGER NOT NULL,
+    component_id INTEGER NOT NULL,
+    quantity INTEGER NOT NULL DEFAULT 1,
+    purpose_note TEXT,
+    status TEXT NOT NULL DEFAULT 'PENDING',
+    admin_id INTEGER,
+    rejection_reason TEXT,
+    confirmation_token TEXT,
+    confirmation_token_expiry DATETIME,
+    confirmed_at DATETIME,
+    last_edited_by INTEGER,
+    last_edited_at DATETIME,
+    edit_log TEXT DEFAULT '[]',
+    created_at DATETIME DEFAULT (datetime('now', '+5 hours', '+30 minutes')),
+    updated_at DATETIME DEFAULT (datetime('now', '+5 hours', '+30 minutes')),
+    FOREIGN KEY(student_id) REFERENCES students(id),
     FOREIGN KEY(component_id) REFERENCES components(id)
   )`);
 
@@ -244,7 +284,7 @@ async function ensureDbInitialized() {
 // Middleware to ensure DB is ready before any route
 app.use(async (req, res, next) => {
   // Allow these paths without DB
-  const staticPaths = ['/login.html', '/style.css', '/ennovate-logo.png', '/favicon.ico', '/debug-env'];
+  const staticPaths = ['/login.html', '/student-login.html', '/confirm-receipt.html', '/style.css', '/ennovate-logo.png', '/favicon.ico', '/debug-env'];
   if (staticPaths.includes(req.path)) return next();
 
   try {
@@ -436,6 +476,23 @@ app.get("/students-page", requireAdmin, (req, res) => {
 
 app.get("/student.html", (req, res) => {
   safeSendFile(res, path.join(__dirname, "public", "student.html"));
+});
+
+app.get("/admin-requests-page", requireAdmin, (req, res) => {
+  safeSendFile(res, path.join(__dirname, "public", "admin-requests.html"));
+});
+
+// Student portal page routes
+app.get("/student-dashboard", requireStudent, (req, res) => {
+  safeSendFile(res, path.join(__dirname, "public", "student-dashboard.html"));
+});
+
+app.get("/student-catalog", requireStudent, (req, res) => {
+  safeSendFile(res, path.join(__dirname, "public", "student-catalog.html"));
+});
+
+app.get("/student-requests-page", requireStudent, (req, res) => {
+  safeSendFile(res, path.join(__dirname, "public", "student-requests.html"));
 });
 
 // ================= COMPONENT ROUTES =================
@@ -1108,6 +1165,434 @@ app.get("/download-report-excel", requireAdmin, async (req, res) => {
 
   await workbook.xlsx.write(res);
   res.end();
+});
+
+// ================= EMAIL SERVICE =================
+
+let emailTransporter = null;
+
+function getEmailTransporter() {
+  if (emailTransporter) return emailTransporter;
+  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+    emailTransporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT) || 587,
+      secure: (process.env.SMTP_PORT === '465'),
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
+    return emailTransporter;
+  }
+  return null;
+}
+
+async function sendEmail(to, subject, htmlBody) {
+  const transporter = getEmailTransporter();
+  const from = process.env.SMTP_FROM || '"CERP — Club Ennovate" <noreply@cerp.club>';
+  if (!transporter) {
+    console.log("=== EMAIL (no SMTP configured, logging instead) ===");
+    console.log(`To: ${to}`);
+    console.log(`Subject: ${subject}`);
+    console.log(`Body: ${htmlBody.substring(0, 200)}...`);
+    console.log("===================================================");
+    return;
+  }
+  try {
+    await transporter.sendMail({ from, to, subject, html: htmlBody });
+    console.log(`Email sent to ${to}: ${subject}`);
+  } catch (err) {
+    console.error("Email send error:", err.message);
+  }
+}
+
+function buildApprovalEmailHtml(studentName, componentName, quantity, confirmUrl) {
+  return `
+    <div style="font-family: 'Segoe UI', sans-serif; max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.08);">
+      <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 24px 32px;">
+        <h1 style="color: #ffffff; font-size: 22px; margin: 0;">CERP</h1>
+        <p style="color: rgba(255,255,255,0.7); font-size: 13px; margin: 4px 0 0;">Club Ennovate Resource Portal</p>
+      </div>
+      <div style="padding: 28px 32px;">
+        <h2 style="color: #0f172a; font-size: 18px; margin: 0 0 16px;">Your request has been approved! ✅</h2>
+        <p style="color: #475569; font-size: 14px; line-height: 1.6;">Hi <strong>${studentName}</strong>,</p>
+        <p style="color: #475569; font-size: 14px; line-height: 1.6;">Your component request has been approved by the admin.</p>
+        <div style="background: #f1f5f9; border-radius: 8px; padding: 16px; margin: 16px 0;">
+          <p style="margin: 0; color: #334155;"><strong>Component:</strong> ${componentName}</p>
+          <p style="margin: 4px 0 0; color: #334155;"><strong>Quantity:</strong> ${quantity}</p>
+        </div>
+        <p style="color: #475569; font-size: 14px;">Please collect the component from the lab and confirm receipt:</p>
+        <div style="text-align: center; margin: 24px 0;">
+          <a href="${confirmUrl}" style="background: #0f172a; color: #ffffff; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block;">Confirm Receipt</a>
+        </div>
+        <p style="color: #94a3b8; font-size: 12px;">This link expires in 7 days.</p>
+      </div>
+      <div style="background: #f8fafc; padding: 16px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
+        <p style="color: #94a3b8; font-size: 11px; margin: 0;">CERP — Club Ennovate | Auto-generated notification</p>
+      </div>
+    </div>
+  `;
+}
+
+function buildRejectionEmailHtml(studentName, componentName, quantity, reason) {
+  return `
+    <div style="font-family: 'Segoe UI', sans-serif; max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.08);">
+      <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 24px 32px;">
+        <h1 style="color: #ffffff; font-size: 22px; margin: 0;">CERP</h1>
+        <p style="color: rgba(255,255,255,0.7); font-size: 13px; margin: 4px 0 0;">Club Ennovate Resource Portal</p>
+      </div>
+      <div style="padding: 28px 32px;">
+        <h2 style="color: #0f172a; font-size: 18px; margin: 0 0 16px;">Update on your component request</h2>
+        <p style="color: #475569; font-size: 14px; line-height: 1.6;">Hi <strong>${studentName}</strong>,</p>
+        <p style="color: #475569; font-size: 14px; line-height: 1.6;">Unfortunately, your request could not be approved at this time.</p>
+        <div style="background: #fef2f2; border-radius: 8px; padding: 16px; margin: 16px 0; border-left: 4px solid #ef4444;">
+          <p style="margin: 0; color: #334155;"><strong>Component:</strong> ${componentName}</p>
+          <p style="margin: 4px 0 0; color: #334155;"><strong>Quantity:</strong> ${quantity}</p>
+          ${reason ? `<p style="margin: 8px 0 0; color: #dc2626;"><strong>Reason:</strong> ${reason}</p>` : ''}
+        </div>
+        <p style="color: #475569; font-size: 14px;">You may submit a new request or contact the admin for more information.</p>
+      </div>
+      <div style="background: #f8fafc; padding: 16px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
+        <p style="color: #94a3b8; font-size: 11px; margin: 0;">CERP — Club Ennovate | Auto-generated notification</p>
+      </div>
+    </div>
+  `;
+}
+
+// ================= STUDENT AUTH ROUTES =================
+
+app.post("/student-login", loginRateLimiter, async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    const result = await db.execute({ sql: "SELECT * FROM students WHERE LOWER(email) = LOWER(?)", args: [email] });
+    if (result.rows.length === 0) {
+      return res.json({ success: false, message: "Email not found" });
+    }
+    const student = result.rows[0];
+    if (!student.password) {
+      return res.json({ success: false, message: "Account not configured. Contact admin." });
+    }
+    const match = await bcrypt.compare(password, student.password);
+    if (!match) {
+      return res.json({ success: false, message: "Incorrect password" });
+    }
+    req.session.student_id = student.id;
+    req.session.role = "student";
+    req.session.save((err) => {
+      if (err) return res.status(500).json({ success: false, message: "Session error" });
+      res.json({ success: true });
+    });
+  } catch (err) {
+    console.error("Student login error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+app.post("/student-logout", (req, res) => {
+  req.session.destroy(() => res.json({ success: true }));
+});
+
+app.get("/student-session", requireStudent, async (req, res) => {
+  try {
+    const result = await db.execute({ sql: "SELECT id, student_name, usn, email, phone FROM students WHERE id = ?", args: [req.session.student_id] });
+    if (result.rows.length === 0) return res.status(404).json({ message: "Student not found" });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// ================= STUDENT PORTAL API =================
+
+// Student Dashboard Data
+app.get("/api/student/dashboard", requireStudent, async (req, res) => {
+  try {
+    const sid = req.session.student_id;
+    // Active borrows
+    const borrows = await db.execute({
+      sql: `SELECT components.name AS component_name, issue_items.quantity, issue_items.returned_quantity,
+              (issue_items.quantity - issue_items.returned_quantity) AS remaining, issues.issue_timestamp
+            FROM issues JOIN issue_items ON issue_items.issue_id = issues.id
+            JOIN components ON issue_items.component_id = components.id
+            WHERE issues.student_id = ? AND (issue_items.quantity - issue_items.returned_quantity) > 0
+            ORDER BY issues.issue_timestamp DESC`, args: [sid]
+    });
+    // Pending requests
+    const pending = await db.execute({
+      sql: `SELECT cr.id, cr.quantity, cr.purpose_note, cr.status, cr.created_at, cr.updated_at,
+              c.name AS component_name
+            FROM component_requests cr JOIN components c ON cr.component_id = c.id
+            WHERE cr.student_id = ? AND cr.status IN ('PENDING', 'DRAFT')
+            ORDER BY cr.created_at DESC`, args: [sid]
+    });
+    // Recent history
+    const history = await db.execute({
+      sql: `SELECT cr.id, cr.quantity, cr.purpose_note, cr.status, cr.created_at, cr.confirmed_at,
+              c.name AS component_name, cr.rejection_reason
+            FROM component_requests cr JOIN components c ON cr.component_id = c.id
+            WHERE cr.student_id = ? AND cr.status NOT IN ('PENDING', 'DRAFT')
+            ORDER BY cr.updated_at DESC LIMIT 50`, args: [sid]
+    });
+    res.json({ borrows: borrows.rows, pending: pending.rows, history: history.rows });
+  } catch (err) {
+    console.error("Student dashboard error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Student Catalog (read-only)
+app.get("/api/student/catalog", requireStudent, async (req, res) => {
+  try {
+    const result = await db.execute("SELECT id, name, total_quantity, available_quantity, photo1, photo2 FROM components ORDER BY name ASC");
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Submit a component request
+app.post("/api/student/request", requireStudent, async (req, res) => {
+  const { component_id, quantity, purpose_note } = req.body;
+  if (!component_id || !quantity || quantity < 1) return res.json({ success: false, message: "Invalid request" });
+  try {
+    const comp = await db.execute({ sql: "SELECT * FROM components WHERE id = ?", args: [component_id] });
+    if (comp.rows.length === 0) return res.json({ success: false, message: "Component not found" });
+    await db.execute({
+      sql: `INSERT INTO component_requests (student_id, component_id, quantity, purpose_note, status) VALUES (?, ?, ?, ?, 'PENDING')`,
+      args: [req.session.student_id, component_id, quantity, purpose_note || null]
+    });
+    res.json({ success: true, message: "Request submitted successfully" });
+  } catch (err) {
+    console.error("Request submit error:", err);
+    res.json({ success: false, message: "Error submitting request" });
+  }
+});
+
+// Get own requests
+app.get("/api/student/requests", requireStudent, async (req, res) => {
+  try {
+    const result = await db.execute({
+      sql: `SELECT cr.id, cr.quantity, cr.purpose_note, cr.status, cr.created_at, cr.updated_at,
+              cr.rejection_reason, cr.confirmed_at,
+              c.name AS component_name, c.id AS component_id
+            FROM component_requests cr JOIN components c ON cr.component_id = c.id
+            WHERE cr.student_id = ?
+            ORDER BY cr.created_at DESC`, args: [req.session.student_id]
+    });
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Edit own pending request
+app.put("/api/student/request/:id", requireStudent, async (req, res) => {
+  const { component_id, quantity, purpose_note } = req.body;
+  try {
+    const req_result = await db.execute({ sql: "SELECT * FROM component_requests WHERE id = ? AND student_id = ?", args: [req.params.id, req.session.student_id] });
+    if (req_result.rows.length === 0) return res.json({ success: false, message: "Request not found" });
+    const request = req_result.rows[0];
+    if (request.status !== 'PENDING' && request.status !== 'DRAFT') {
+      return res.json({ success: false, message: "Cannot edit — request already processed" });
+    }
+    await db.execute({
+      sql: `UPDATE component_requests SET component_id = ?, quantity = ?, purpose_note = ?, updated_at = datetime('now', '+5 hours', '+30 minutes') WHERE id = ?`,
+      args: [component_id || request.component_id, quantity || request.quantity, purpose_note !== undefined ? purpose_note : request.purpose_note, req.params.id]
+    });
+    res.json({ success: true, message: "Request updated" });
+  } catch (err) {
+    console.error("Request edit error:", err);
+    res.json({ success: false, message: "Error updating request" });
+  }
+});
+
+// Withdraw own pending request
+app.post("/api/student/request/:id/withdraw", requireStudent, async (req, res) => {
+  try {
+    const req_result = await db.execute({ sql: "SELECT * FROM component_requests WHERE id = ? AND student_id = ?", args: [req.params.id, req.session.student_id] });
+    if (req_result.rows.length === 0) return res.json({ success: false, message: "Request not found" });
+    if (req_result.rows[0].status !== 'PENDING' && req_result.rows[0].status !== 'DRAFT') {
+      return res.json({ success: false, message: "Cannot withdraw — request already processed" });
+    }
+    await db.execute({ sql: "UPDATE component_requests SET status = 'WITHDRAWN', updated_at = datetime('now', '+5 hours', '+30 minutes') WHERE id = ?", args: [req.params.id] });
+    res.json({ success: true, message: "Request withdrawn" });
+  } catch (err) {
+    res.json({ success: false, message: "Error withdrawing request" });
+  }
+});
+
+// ================= ADMIN REQUEST QUEUE API =================
+
+// Get all requests (admin)
+app.get("/api/admin/requests", requireAdmin, async (req, res) => {
+  try {
+    const statusFilter = req.query.status;
+    let sql = `SELECT cr.*, c.name AS component_name, c.available_quantity,
+                s.student_name, s.usn, s.email, s.phone
+              FROM component_requests cr
+              JOIN components c ON cr.component_id = c.id
+              JOIN students s ON cr.student_id = s.id`;
+    const args = [];
+    if (statusFilter && statusFilter !== 'ALL') {
+      sql += ` WHERE cr.status = ?`;
+      args.push(statusFilter);
+    }
+    sql += ` ORDER BY cr.created_at DESC`;
+    const result = await db.execute({ sql, args });
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Admin requests error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Approve a request (admin)
+app.post("/api/admin/requests/:id/approve", requireAdmin, async (req, res) => {
+  try {
+    const reqRow = await db.execute({ sql: "SELECT cr.*, c.name AS component_name, c.available_quantity, s.student_name, s.email FROM component_requests cr JOIN components c ON cr.component_id = c.id JOIN students s ON cr.student_id = s.id WHERE cr.id = ?", args: [req.params.id] });
+    if (reqRow.rows.length === 0) return res.json({ success: false, message: "Request not found" });
+    const request = reqRow.rows[0];
+    if (request.status === 'APPROVED') return res.json({ success: false, message: "Already approved" });
+    // Check stock
+    if (request.available_quantity < request.quantity) {
+      return res.json({ success: false, message: `Insufficient stock. Only ${request.available_quantity} available.` });
+    }
+    // Generate confirmation token
+    const token = crypto.randomUUID();
+    const expiryDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    // Update request status
+    await db.execute({
+      sql: `UPDATE component_requests SET status = 'APPROVED', admin_id = ?, confirmation_token = ?, confirmation_token_expiry = ?, updated_at = datetime('now', '+5 hours', '+30 minutes') WHERE id = ?`,
+      args: [req.session.admin, token, expiryDate, req.params.id]
+    });
+    // Create issue record
+    const issueResult = await db.execute({ sql: "INSERT INTO issues (student_id, request_id) VALUES (?, ?)", args: [request.student_id, req.params.id] });
+    const issue_id = Number(issueResult.lastInsertRowid);
+    await db.execute({ sql: "INSERT INTO issue_items (issue_id, component_id, quantity) VALUES (?, ?, ?)", args: [issue_id, request.component_id, request.quantity] });
+    // Decrement stock
+    await db.execute({ sql: "UPDATE components SET available_quantity = available_quantity - ? WHERE id = ?", args: [request.quantity, request.component_id] });
+    // Send approval email
+    const baseUrl = req.protocol + '://' + req.get('host');
+    const confirmUrl = `${baseUrl}/confirm-receipt.html?token=${token}`;
+    if (request.email) {
+      await sendEmail(
+        request.email,
+        'CERP: Your component request has been approved',
+        buildApprovalEmailHtml(request.student_name, request.component_name, request.quantity, confirmUrl)
+      );
+    }
+    res.json({ success: true, message: "Request approved" });
+  } catch (err) {
+    console.error("Approve error:", err);
+    res.json({ success: false, message: "Error approving request" });
+  }
+});
+
+// Reject a request (admin)
+app.post("/api/admin/requests/:id/reject", requireAdmin, async (req, res) => {
+  const { reason } = req.body;
+  try {
+    const reqRow = await db.execute({ sql: "SELECT cr.*, c.name AS component_name, s.student_name, s.email FROM component_requests cr JOIN components c ON cr.component_id = c.id JOIN students s ON cr.student_id = s.id WHERE cr.id = ?", args: [req.params.id] });
+    if (reqRow.rows.length === 0) return res.json({ success: false, message: "Request not found" });
+    const request = reqRow.rows[0];
+    await db.execute({
+      sql: `UPDATE component_requests SET status = 'REJECTED', admin_id = ?, rejection_reason = ?, updated_at = datetime('now', '+5 hours', '+30 minutes') WHERE id = ?`,
+      args: [req.session.admin, reason || null, req.params.id]
+    });
+    if (request.email) {
+      await sendEmail(
+        request.email,
+        'CERP: Update on your component request',
+        buildRejectionEmailHtml(request.student_name, request.component_name, request.quantity, reason)
+      );
+    }
+    res.json({ success: true, message: "Request rejected" });
+  } catch (err) {
+    console.error("Reject error:", err);
+    res.json({ success: false, message: "Error rejecting request" });
+  }
+});
+
+// Admin edit a request
+app.put("/api/admin/requests/:id", requireAdmin, async (req, res) => {
+  const { component_id, quantity, purpose_note, status } = req.body;
+  try {
+    const reqRow = await db.execute({ sql: "SELECT * FROM component_requests WHERE id = ?", args: [req.params.id] });
+    if (reqRow.rows.length === 0) return res.json({ success: false, message: "Request not found" });
+    const original = reqRow.rows[0];
+    const changes = [];
+    if (component_id && component_id !== original.component_id) changes.push({ field: 'component_id', old: original.component_id, new: component_id });
+    if (quantity && quantity !== original.quantity) changes.push({ field: 'quantity', old: original.quantity, new: quantity });
+    if (purpose_note !== undefined && purpose_note !== original.purpose_note) changes.push({ field: 'purpose_note', old: original.purpose_note, new: purpose_note });
+    if (status && status !== original.status) changes.push({ field: 'status', old: original.status, new: status });
+    const editLog = JSON.parse(original.edit_log || '[]');
+    editLog.push({ editor_id: req.session.admin, editor_role: 'admin', changed_fields: changes, timestamp: new Date().toISOString() });
+    await db.execute({
+      sql: `UPDATE component_requests SET component_id = ?, quantity = ?, purpose_note = ?, status = ?, last_edited_by = ?, last_edited_at = datetime('now', '+5 hours', '+30 minutes'), edit_log = ?, updated_at = datetime('now', '+5 hours', '+30 minutes') WHERE id = ?`,
+      args: [component_id || original.component_id, quantity || original.quantity, purpose_note !== undefined ? purpose_note : original.purpose_note, status || original.status, req.session.admin, JSON.stringify(editLog), req.params.id]
+    });
+    res.json({ success: true, message: "Request updated" });
+  } catch (err) {
+    console.error("Admin edit request error:", err);
+    res.json({ success: false, message: "Error updating request" });
+  }
+});
+
+// Create student account (admin)
+app.post("/api/admin/create-student-account", requireAdmin, async (req, res) => {
+  const { student_name, usn, phone, email, password } = req.body;
+  if (!student_name || !usn || !email || !password) return res.json({ success: false, message: "Name, USN, email, and password are required" });
+  try {
+    const hashedPw = await bcrypt.hash(password, 10);
+    // Try to upsert
+    const existing = await db.execute({ sql: "SELECT id FROM students WHERE usn = ?", args: [usn] });
+    if (existing.rows.length > 0) {
+      await db.execute({ sql: "UPDATE students SET student_name = ?, phone = ?, email = ?, password = ? WHERE usn = ?", args: [student_name, phone || null, email, hashedPw, usn] });
+      res.json({ success: true, message: "Student account updated" });
+    } else {
+      await db.execute({ sql: "INSERT INTO students (student_name, usn, phone, email, password) VALUES (?, ?, ?, ?, ?)", args: [student_name, usn, phone || null, email, hashedPw] });
+      res.json({ success: true, message: "Student account created" });
+    }
+  } catch (err) {
+    console.error("Create student account error:", err);
+    res.json({ success: false, message: "Error: " + err.message });
+  }
+});
+
+// ================= CONFIRM RECEIPT (PUBLIC) =================
+
+app.get("/api/confirm-receipt", async (req, res) => {
+  const { token } = req.query;
+  if (!token) return res.json({ success: false, message: "No token provided" });
+  try {
+    const result = await db.execute({ sql: "SELECT * FROM component_requests WHERE confirmation_token = ?", args: [token] });
+    if (result.rows.length === 0) return res.json({ success: false, message: "Invalid or expired token" });
+    const request = result.rows[0];
+    if (request.confirmed_at) return res.json({ success: true, message: "Already confirmed", already_confirmed: true });
+    if (request.confirmation_token_expiry && new Date(request.confirmation_token_expiry) < new Date()) {
+      return res.json({ success: false, message: "Token has expired" });
+    }
+    await db.execute({
+      sql: `UPDATE component_requests SET status = 'CONFIRMED', confirmed_at = datetime('now', '+5 hours', '+30 minutes'), updated_at = datetime('now', '+5 hours', '+30 minutes') WHERE id = ?`,
+      args: [request.id]
+    });
+    res.json({ success: true, message: "Receipt confirmed. Thank you!" });
+  } catch (err) {
+    console.error("Confirm receipt error:", err);
+    res.json({ success: false, message: "Error confirming receipt" });
+  }
+});
+
+// ================= ADMIN DASHBOARD SUMMARY (updated) =================
+
+app.get("/pending-requests-count", requireAdmin, async (req, res) => {
+  try {
+    const result = await db.execute("SELECT COUNT(*) AS count FROM component_requests WHERE status = 'PENDING'");
+    res.json({ count: result.rows[0].count || 0 });
+  } catch (err) {
+    res.json({ count: 0 });
+  }
 });
 
 // ================= GLOBAL ERROR HANDLER =================

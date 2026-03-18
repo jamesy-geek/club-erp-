@@ -23,6 +23,7 @@
       <a href="/reports-page" id="nav-reports">Reports</a>
       <a href="/students-page" id="nav-students">Students</a>
       <a href="/student.html" id="nav-profile">Student Profile</a>
+      <a href="/admin-requests-page" id="nav-requests">Request Queue</a>
 
       <hr>
 
@@ -81,6 +82,29 @@
       <div class="card" style="max-width:400px;">
         <h3>Existing Admins</h3>
         <div id="adminList"></div>
+      </div>
+
+      <!-- Create Student Account -->
+      <div class="card" style="max-width:400px; border-left: 4px solid #4f46e5;">
+        <h3>🎓 Create Student Account</h3>
+        <p style="color: #666; font-size:13px; margin-bottom: 12px;">Create login credentials for students to access the Student Portal.</p>
+
+        <label>Name</label>
+        <input id="stuAccName" placeholder="Student full name">
+
+        <label>USN</label>
+        <input id="stuAccUSN" placeholder="e.g. 4NN22CS001">
+
+        <label>Phone</label>
+        <input id="stuAccPhone" placeholder="Phone number (optional)">
+
+        <label>Email</label>
+        <input id="stuAccEmail" type="email" placeholder="student@example.com">
+
+        <label>Password</label>
+        <input id="stuAccPassword" type="password" placeholder="Set initial password">
+
+        <button style="margin-top:15px; background:#4f46e5;" onclick="createStudentAccount()">Create Student Account</button>
       </div>
 
       <!-- Database Backup -->
@@ -239,6 +263,45 @@
         loadAdmins();
       } else {
         showToast(data.message || "Failed to delete", false);
+      }
+    }
+
+    // ===== STUDENT ACCOUNT CREATION =====
+
+    async function createStudentAccount() {
+      const student_name = document.getElementById("stuAccName").value.trim();
+      const usn = document.getElementById("stuAccUSN").value.trim();
+      const phone = document.getElementById("stuAccPhone").value.trim();
+      const email = document.getElementById("stuAccEmail").value.trim();
+      const password = document.getElementById("stuAccPassword").value.trim();
+
+      if (!student_name || !usn || !email || !password) {
+        showToast("Name, USN, email, and password are required", false);
+        return;
+      }
+
+      if (password.length < 4) {
+        showToast("Password must be at least 4 characters", false);
+        return;
+      }
+
+      const res = await fetch("/api/admin/create-student-account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ student_name, usn, phone, email, password })
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        showToast(data.message);
+        document.getElementById("stuAccName").value = "";
+        document.getElementById("stuAccUSN").value = "";
+        document.getElementById("stuAccPhone").value = "";
+        document.getElementById("stuAccEmail").value = "";
+        document.getElementById("stuAccPassword").value = "";
+      } else {
+        showToast(data.message, false);
       }
     }
 
