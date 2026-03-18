@@ -41,7 +41,7 @@ try {
   if (!dbUrl) {
     throw new Error("No database URL found (checked TURSO_DATABASE_URL, LIBSQL_DB_URL, and DATABASE_URL)");
   }
-  
+
   db = createClient({
     url: dbUrl,
     authToken: authToken,
@@ -202,10 +202,10 @@ async function initDatabase() {
   )`);
 
   // Add new columns to students if they don't exist
-  try { await db.execute(`ALTER TABLE students ADD COLUMN email TEXT`); } catch(e) { /* column exists */ }
-  try { await db.execute(`ALTER TABLE students ADD COLUMN password TEXT`); } catch(e) { /* column exists */ }
-  try { await db.execute(`ALTER TABLE students ADD COLUMN semester TEXT`); } catch(e) { /* column exists */ }
-  try { await db.execute(`ALTER TABLE students ADD COLUMN department TEXT`); } catch(e) { /* column exists */ }
+  try { await db.execute(`ALTER TABLE students ADD COLUMN email TEXT`); } catch (e) { /* column exists */ }
+  try { await db.execute(`ALTER TABLE students ADD COLUMN password TEXT`); } catch (e) { /* column exists */ }
+  try { await db.execute(`ALTER TABLE students ADD COLUMN semester TEXT`); } catch (e) { /* column exists */ }
+  try { await db.execute(`ALTER TABLE students ADD COLUMN department TEXT`); } catch (e) { /* column exists */ }
 
   // Backups table (stores full DB snapshots as JSON)
   await db.execute(`CREATE TABLE IF NOT EXISTS backups (
@@ -224,7 +224,7 @@ async function initDatabase() {
   )`);
 
   // Add request_id column to issues if it doesn't exist
-  try { await db.execute(`ALTER TABLE issues ADD COLUMN request_id INTEGER`); } catch(e) { /* column exists */ }
+  try { await db.execute(`ALTER TABLE issues ADD COLUMN request_id INTEGER`); } catch (e) { /* column exists */ }
 
   await db.execute(`CREATE TABLE IF NOT EXISTS issue_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -260,9 +260,9 @@ async function initDatabase() {
 
   // Ensure default admin exists and reset password to 'admin123'
   const hashed = await bcrypt.hash("admin123", 10);
-  await db.execute({ 
-    sql: "INSERT INTO admins (username, password) VALUES (?, ?) ON CONFLICT(username) DO UPDATE SET password = excluded.password", 
-    args: ["admin", hashed] 
+  await db.execute({
+    sql: "INSERT INTO admins (username, password) VALUES (?, ?) ON CONFLICT(username) DO UPDATE SET password = excluded.password",
+    args: ["admin", hashed]
   });
   console.log("Default admin updated/created → admin / admin123");
 
@@ -275,7 +275,7 @@ let dbInitializationPromise = null;
 async function ensureDbInitialized() {
   if (dbReady) return true;
   if (dbInitializationPromise) return dbInitializationPromise;
-  
+
   dbInitializationPromise = (async () => {
     try {
       console.log("Starting database initialization...");
@@ -289,7 +289,7 @@ async function ensureDbInitialized() {
       throw err;
     }
   })();
-  
+
   return dbInitializationPromise;
 }
 
@@ -304,10 +304,10 @@ app.use(async (req, res, next) => {
     next();
   } catch (err) {
     console.error("Request failed due to DB error:", err.message);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: "Database connection failed. Check your Turso console and environment variables.",
-      error: err.message 
+      error: err.message
     });
   }
 });
@@ -357,11 +357,11 @@ app.post("/login", loginRateLimiter, async (req, res) => {
     // No more manual dbReady check here, handled by middleware
 
     console.log(`Login attempt for username: "${username}"`);
-    
+
     // Case-insensitive lookup for more reliability
-    const result = await db.execute({ 
-      sql: "SELECT * FROM admins WHERE LOWER(username) = LOWER(?)", 
-      args: [username] 
+    const result = await db.execute({
+      sql: "SELECT * FROM admins WHERE LOWER(username) = LOWER(?)",
+      args: [username]
     });
 
     if (result.rows.length === 0) {
@@ -374,7 +374,7 @@ app.post("/login", loginRateLimiter, async (req, res) => {
 
     const admin = result.rows[0];
     const match = await bcrypt.compare(password, admin.password);
-    
+
     if (!match) {
       console.warn(`Login failed: Incorrect password for "${username}".`);
       const record = loginAttempts.get(req.ip) || { count: 0, lastAttempt: Date.now() };
@@ -486,8 +486,8 @@ app.get("/students-page", requireAdmin, (req, res) => {
   safeSendFile(res, path.join(__dirname, "public", "students.html"));
 });
 
-app.get("/student.html", (req, res) => {
-  safeSendFile(res, path.join(__dirname, "public", "student.html"));
+app.get("/student_profile.html", (req, res) => {
+  safeSendFile(res, path.join(__dirname, "public", "student_profile.html"));
 });
 
 app.get("/admin-requests-page", requireAdmin, (req, res) => {
