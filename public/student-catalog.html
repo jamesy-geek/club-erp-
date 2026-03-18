@@ -4,6 +4,7 @@
   <title>Component Catalog — CERP</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="/style.css">
+<script>if(localStorage.getItem("darkMode")=="true")document.documentElement.className="dark"</script>
 </head>
 <body>
 
@@ -57,7 +58,7 @@
 
       <div class="modal-actions">
         <button class="btn-cancel" onclick="closeRequestModal()">Cancel</button>
-        <button onclick="submitRequest()" style="background: #4f46e5;">Submit Request</button>
+        <button onclick="submitRequest()" style="background: #1e293b;">Submit Request</button>
       </div>
     </div>
   </div>
@@ -121,7 +122,7 @@
               </div>
               <p style="color:#64748b; font-size:13px; margin:0;">Total: ${c.total_quantity} | Available: ${c.available_quantity}</p>
             </div>
-            <button onclick="openRequestModal(${c.id}, '${c.name.replace(/'/g, "\\'")}', ${c.available_quantity})" style="margin-top:14px; background: ${inStock ? '#4f46e5' : '#94a3b8'}; width:100%; justify-content:center;">
+            <button onclick="openRequestModal(${c.id}, '${c.name.replace(/'/g, "\\'")}', ${c.available_quantity})" style="margin-top:14px; background: ${inStock ? '#1e293b' : '#94a3b8'}; width:100%; justify-content:center;">
               ${inStock ? '📨 Request' : '📨 Request (Out of Stock)'}
             </button>
           </div>
@@ -180,5 +181,6 @@
     window.onload = loadCatalog;
   </script>
 
+<script src="/dark-mode.js"></script>
 </body>
 </html>

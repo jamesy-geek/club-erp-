@@ -572,7 +572,7 @@ tbody tr:hover {
 /* ================= STUDENT SIDEBAR ================= */
 
 .student-sidebar {
-  background: linear-gradient(180deg, #1e1b4b 0%, #312e81 100%);
+  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
 }
 
 .student-sidebar a:hover,
@@ -597,4 +597,178 @@ tbody tr:hover {
   #catalogGrid {
     grid-template-columns: 1fr !important;
   }
+}
+
+/* ================= DARK MODE TOGGLE ================= */
+
+.dark-mode-toggle {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #0f172a;
+  color: #f8fafc;
+  border: 2px solid rgba(255,255,255,0.15);
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9998;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  transition: all 0.3s ease;
+  padding: 0;
+}
+
+.dark-mode-toggle:hover {
+  transform: scale(1.12);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+  background: #1e293b;
+}
+
+body.dark .dark-mode-toggle {
+  background: #f8fafc;
+  color: #0f172a;
+  border-color: rgba(0,0,0,0.1);
+}
+
+/* ================= DARK MODE ================= */
+
+body.dark {
+  background: #0a0e17;
+  color: #e2e8f0;
+}
+
+body.dark .content h1 {
+  color: #f1f5f9;
+}
+
+body.dark .card {
+  background: #111827;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.2);
+}
+
+body.dark .card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.3);
+}
+
+body.dark .card h3 {
+  color: #cbd5e1;
+}
+
+body.dark input,
+body.dark select,
+body.dark textarea {
+  background: #1e293b;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+body.dark input:focus,
+body.dark select:focus,
+body.dark textarea:focus {
+  border-color: #64748b;
+  box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.2);
+  background: #0f172a;
+}
+
+body.dark input[type="file"] {
+  background: #1e293b;
+}
+
+body.dark label {
+  color: #94a3b8;
+}
+
+body.dark thead {
+  background: #1e293b;
+}
+
+body.dark th,
+body.dark td {
+  border-bottom-color: #1e293b;
+}
+
+body.dark tbody tr:hover {
+  background: #1e293b;
+}
+
+body.dark .modal-overlay {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+body.dark .modal-box {
+  background: #111827;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+
+body.dark .modal-box h2 {
+  color: #f1f5f9;
+}
+
+body.dark .modal-box label {
+  color: #94a3b8;
+}
+
+body.dark .modal-box .btn-cancel {
+  background: #334155;
+  color: #e2e8f0;
+}
+
+body.dark .modal-box .btn-cancel:hover {
+  background: #475569;
+}
+
+body.dark #toast {
+  background: #1e293b;
+}
+
+body.dark .menu-toggle {
+  background: #111827;
+}
+
+body.dark .menu-toggle:hover {
+  background: #1e293b;
+}
+
+body.dark .sidebar {
+  background: linear-gradient(180deg, #000000 0%, #0f172a 100%);
+}
+
+body.dark .student-sidebar {
+  background: linear-gradient(180deg, #000000 0%, #0f172a 100%);
+}
+
+body.dark code {
+  background: #1e293b;
+  color: #e2e8f0;
+}
+
+/* Dark mode for inline styles in HTML — general overrides */
+body.dark [style*="background:#f8fafc"],
+body.dark [style*="background: #f8fafc"],
+body.dark [style*="background:#f1f5f9"],
+body.dark [style*="background: #f1f5f9"] {
+  background: #1e293b !important;
+}
+
+body.dark [style*="color:#334155"],
+body.dark [style*="color: #334155"] {
+  color: #94a3b8 !important;
+}
+
+body.dark [style*="color:#475569"],
+body.dark [style*="color: #475569"] {
+  color: #94a3b8 !important;
+}
+
+body.dark [style*="color:#64748b"],
+body.dark [style*="color: #64748b"] {
+  color: #94a3b8 !important;
+}
+
+body.dark [style*="color: #666"] {
+  color: #94a3b8 !important;
 }

@@ -4,6 +4,7 @@
   <title>Student Dashboard — CERP</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="/style.css">
+<script>if(localStorage.getItem("darkMode")=="true")document.documentElement.className="dark"</script>
 </head>
 <body>
 
@@ -34,7 +35,7 @@
       <!-- Quick Request CTA -->
       <div style="margin-bottom: 24px;">
         <a href="/student-catalog" style="text-decoration:none;">
-          <button style="background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%); font-size: 15px; padding: 14px 28px;">
+          <button style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); font-size: 15px; padding: 14px 28px;">
             📦 Browse & Request Components
           </button>
         </a>
@@ -167,5 +168,6 @@
     window.onload = loadDashboard;
   </script>
 
+<script src="/dark-mode.js"></script>
 </body>
 </html>

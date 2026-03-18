@@ -4,6 +4,7 @@
   <title>My Requests — CERP</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="/style.css">
+<script>if(localStorage.getItem("darkMode")=="true")document.documentElement.className="dark"</script>
 </head>
 <body>
 
@@ -31,7 +32,7 @@
           <p style="color:#64748b; font-size:14px; margin:0;">View and manage your component requests</p>
         </div>
         <a href="/student-catalog" style="text-decoration:none;">
-          <button style="background:#4f46e5;">+ New Request</button>
+          <button style="background:#1e293b;">+ New Request</button>
         </a>
       </div>
 
@@ -229,5 +230,6 @@
     window.onload = loadRequests;
   </script>
 
+<script src="/dark-mode.js"></script>
 </body>
 </html>

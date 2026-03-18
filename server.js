@@ -8,6 +8,8 @@ const PDFDocument = require("pdfkit-table");
 const ExcelJS = require("exceljs");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
+const multer = require("multer");
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 
 // Load .env in development
@@ -199,9 +201,19 @@ async function initDatabase() {
     phone TEXT
   )`);
 
-  // Add email and password columns to students if they don't exist
+  // Add new columns to students if they don't exist
   try { await db.execute(`ALTER TABLE students ADD COLUMN email TEXT`); } catch(e) { /* column exists */ }
   try { await db.execute(`ALTER TABLE students ADD COLUMN password TEXT`); } catch(e) { /* column exists */ }
+  try { await db.execute(`ALTER TABLE students ADD COLUMN semester TEXT`); } catch(e) { /* column exists */ }
+  try { await db.execute(`ALTER TABLE students ADD COLUMN department TEXT`); } catch(e) { /* column exists */ }
+
+  // Backups table (stores full DB snapshots as JSON)
+  await db.execute(`CREATE TABLE IF NOT EXISTS backups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    data TEXT NOT NULL,
+    created_at DATETIME DEFAULT (datetime('now', '+5 hours', '+30 minutes'))
+  )`);
 
   await db.execute(`CREATE TABLE IF NOT EXISTS issues (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -791,9 +803,6 @@ app.get("/export-database", requireAdmin, async (req, res) => {
 });
 
 // ================= PDF DATABASE BACKUP =================
-
-const multer = require("multer");
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 app.get("/export-database-pdf", requireAdmin, async (req, res) => {
   try {
@@ -1592,6 +1601,256 @@ app.get("/pending-requests-count", requireAdmin, async (req, res) => {
     res.json({ count: result.rows[0].count || 0 });
   } catch (err) {
     res.json({ count: 0 });
+  }
+});
+
+// ================= BULK IMPORT STUDENTS =================
+
+app.get("/api/admin/student-import-template", requireAdmin, async (req, res) => {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Students");
+  sheet.columns = [
+    { header: "Name", key: "name", width: 25 },
+    { header: "USN", key: "usn", width: 18 },
+    { header: "Semester", key: "semester", width: 12 },
+    { header: "Mobile Number", key: "phone", width: 18 },
+    { header: "Email ID", key: "email", width: 30 },
+    { header: "Department", key: "department", width: 15 }
+  ];
+  sheet.addRow({ name: "Example Student", usn: "4NN22CS001", semester: "4th", phone: "9876543210", email: "student@college.edu", department: "CSE" });
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", "attachment; filename=student_import_template.xlsx");
+  await workbook.xlsx.write(res);
+  res.end();
+});
+
+app.post("/api/admin/bulk-import-students", requireAdmin, upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) return res.json({ success: false, message: "No file uploaded" });
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(req.file.buffer);
+    const sheet = workbook.worksheets[0];
+    if (!sheet) return res.json({ success: false, message: "No worksheet found in file" });
+
+    // Find header row
+    const headers = [];
+    sheet.getRow(1).eachCell((cell, col) => {
+      headers[col] = String(cell.value || "").trim().toLowerCase();
+    });
+
+    // Map headers to columns
+    const colMap = {};
+    const fieldAliases = {
+      name: ["name", "student name", "student_name", "full name"],
+      usn: ["usn", "id", "registration number", "reg no", "enrollment"],
+      semester: ["semester", "sem", "year"],
+      phone: ["mobile number", "phone", "mobile", "phone number", "contact", "mobile no"],
+      email: ["email", "email id", "email address", "mail"],
+      department: ["department", "dept", "branch", "stream"]
+    };
+
+    for (const [field, aliases] of Object.entries(fieldAliases)) {
+      for (let i = 1; i < headers.length; i++) {
+        if (aliases.includes(headers[i])) { colMap[field] = i; break; }
+      }
+    }
+
+    if (!colMap.name || !colMap.usn) {
+      return res.json({ success: false, message: "Excel must have at least 'Name' and 'USN' columns" });
+    }
+
+    let created = 0, updated = 0, errors = [];
+    const defaultPassword = await bcrypt.hash("student123", 10);
+
+    for (let r = 2; r <= sheet.actualRowCount; r++) {
+      const row = sheet.getRow(r);
+      const name = String(row.getCell(colMap.name).value || "").trim();
+      const usn = String(row.getCell(colMap.usn).value || "").trim();
+      if (!name || !usn) continue;
+
+      const phone = colMap.phone ? String(row.getCell(colMap.phone).value || "").trim() : "";
+      const email = colMap.email ? String(row.getCell(colMap.email).value || "").trim() : "";
+      const semester = colMap.semester ? String(row.getCell(colMap.semester).value || "").trim() : "";
+      const department = colMap.department ? String(row.getCell(colMap.department).value || "").trim() : "";
+      const password = await bcrypt.hash(usn.toLowerCase(), 10);
+
+      try {
+        const existing = await db.execute({ sql: "SELECT id FROM students WHERE usn = ?", args: [usn] });
+        if (existing.rows.length > 0) {
+          await db.execute({
+            sql: `UPDATE students SET student_name=?, phone=?, email=?, semester=?, department=? WHERE usn=?`,
+            args: [name, phone, email, semester, department, usn]
+          });
+          updated++;
+        } else {
+          await db.execute({
+            sql: `INSERT INTO students (student_name, usn, phone, email, password, semester, department) VALUES (?,?,?,?,?,?,?)`,
+            args: [name, usn, phone, email, password, semester, department]
+          });
+          created++;
+        }
+      } catch (e) {
+        errors.push(`Row ${r}: ${e.message}`);
+      }
+    }
+
+    res.json({ success: true, message: `Import complete: ${created} created, ${updated} updated${errors.length > 0 ? ', ' + errors.length + ' errors' : ''}`, created, updated, errors });
+  } catch (err) {
+    console.error("Bulk import error:", err);
+    res.json({ success: false, message: "Error processing file: " + err.message });
+  }
+});
+
+// ================= GRADUATED STUDENT CLEANUP =================
+
+app.post("/api/admin/cleanup-graduated", requireAdmin, async (req, res) => {
+  try {
+    // Find students who have NO unreturned items
+    const graduatedStudents = await db.execute(`
+      SELECT s.id, s.student_name, s.usn
+      FROM students s
+      WHERE NOT EXISTS (
+        SELECT 1 FROM issues i
+        JOIN issue_items ii ON ii.issue_id = i.id
+        WHERE i.student_id = s.id AND ii.quantity > ii.returned_quantity
+      )
+    `);
+
+    if (graduatedStudents.rows.length === 0) {
+      return res.json({ success: true, message: "No students eligible for cleanup (all have unreturned items)", deleted: 0 });
+    }
+
+    let deleted = 0;
+    for (const student of graduatedStudents.rows) {
+      // Delete their request records first
+      await db.execute({ sql: "DELETE FROM component_requests WHERE student_id = ?", args: [student.id] });
+      // Delete issue items for completed issues
+      const issues = await db.execute({ sql: "SELECT id FROM issues WHERE student_id = ?", args: [student.id] });
+      for (const issue of issues.rows) {
+        await db.execute({ sql: "DELETE FROM issue_items WHERE issue_id = ?", args: [issue.id] });
+      }
+      // Delete issues
+      await db.execute({ sql: "DELETE FROM issues WHERE student_id = ?", args: [student.id] });
+      // Delete student
+      await db.execute({ sql: "DELETE FROM students WHERE id = ?", args: [student.id] });
+      deleted++;
+    }
+
+    res.json({ success: true, message: `Cleaned up ${deleted} graduated students`, deleted });
+  } catch (err) {
+    console.error("Cleanup error:", err);
+    res.json({ success: false, message: "Error during cleanup: " + err.message });
+  }
+});
+
+// ================= AUTO-BACKUP (In-Database) =================
+
+async function createBackup(name) {
+  try {
+    const tables = ['admins', 'components', 'students', 'issues', 'issue_items', 'component_requests'];
+    const backup = {};
+    for (const table of tables) {
+      try {
+        const result = await db.execute(`SELECT * FROM ${table}`);
+        backup[table] = result.rows;
+      } catch (e) {
+        backup[table] = [];
+      }
+    }
+    const data = JSON.stringify(backup);
+    await db.execute({ sql: "INSERT INTO backups (name, data) VALUES (?, ?)", args: [name, data] });
+
+    // Keep only last 10 backups
+    const old = await db.execute("SELECT id FROM backups ORDER BY created_at DESC LIMIT -1 OFFSET 10");
+    for (const row of old.rows) {
+      await db.execute({ sql: "DELETE FROM backups WHERE id = ?", args: [row.id] });
+    }
+
+    console.log(`Backup created: ${name}`);
+    return true;
+  } catch (e) {
+    console.error("Backup error:", e);
+    return false;
+  }
+}
+
+// Schedule auto-backup every 6 hours
+setInterval(async () => {
+  if (!dbReady) return;
+  const now = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  await createBackup(`auto_${now}`);
+}, 6 * 60 * 60 * 1000);
+
+// Create first backup on startup (after 30s delay)
+setTimeout(async () => {
+  if (dbReady) {
+    const now = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    await createBackup(`startup_${now}`);
+  }
+}, 30000);
+
+// Manual backup trigger
+app.post("/api/admin/create-backup", requireAdmin, async (req, res) => {
+  const now = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  const success = await createBackup(`manual_${now}`);
+  res.json({ success, message: success ? "Backup created successfully" : "Failed to create backup" });
+});
+
+// List backups
+app.get("/api/admin/backups", requireAdmin, async (req, res) => {
+  try {
+    const result = await db.execute("SELECT id, name, created_at, LENGTH(data) as size_bytes FROM backups ORDER BY created_at DESC");
+    res.json({ success: true, backups: result.rows });
+  } catch (err) {
+    res.json({ success: true, backups: [] });
+  }
+});
+
+// Download specific backup
+app.get("/api/admin/backup/:id", requireAdmin, async (req, res) => {
+  try {
+    const result = await db.execute({ sql: "SELECT * FROM backups WHERE id = ?", args: [req.params.id] });
+    if (result.rows.length === 0) return res.status(404).json({ message: "Backup not found" });
+    const backup = result.rows[0];
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Content-Disposition", `attachment; filename=cerp_backup_${backup.name}.json`);
+    res.send(backup.data);
+  } catch (err) {
+    res.status(500).json({ message: "Error downloading backup" });
+  }
+});
+
+// Restore from backup
+app.post("/api/admin/restore-backup", requireAdmin, upload.single("file"), async (req, res) => {
+  try {
+    let backupData;
+    if (req.file) {
+      backupData = JSON.parse(req.file.buffer.toString());
+    } else if (req.body.backup_id) {
+      const result = await db.execute({ sql: "SELECT data FROM backups WHERE id = ?", args: [req.body.backup_id] });
+      if (result.rows.length === 0) return res.json({ success: false, message: "Backup not found" });
+      backupData = JSON.parse(result.rows[0].data);
+    } else {
+      return res.json({ success: false, message: "No backup file or ID provided" });
+    }
+
+    // Restore each table
+    const restoreOrder = ['admins', 'components', 'students', 'issues', 'issue_items', 'component_requests'];
+    for (const table of restoreOrder) {
+      if (!backupData[table]) continue;
+      await db.execute(`DELETE FROM ${table}`);
+      for (const row of backupData[table]) {
+        const cols = Object.keys(row);
+        const placeholders = cols.map(() => '?').join(',');
+        await db.execute({ sql: `INSERT INTO ${table} (${cols.join(',')}) VALUES (${placeholders})`, args: cols.map(c => row[c]) });
+      }
+    }
+
+    res.json({ success: true, message: "Database restored successfully from backup" });
+  } catch (err) {
+    console.error("Restore error:", err);
+    res.json({ success: false, message: "Restore failed: " + err.message });
   }
 });
 

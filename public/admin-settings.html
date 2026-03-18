@@ -5,6 +5,7 @@
   <title>Admin Settings</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="/style.css">
+<script>if(localStorage.getItem("darkMode")=="true")document.documentElement.className="dark"</script>
 </head>
 
 <body>
@@ -85,7 +86,7 @@
       </div>
 
       <!-- Create Student Account -->
-      <div class="card" style="max-width:400px; border-left: 4px solid #4f46e5;">
+      <div class="card" style="max-width:400px; border-left: 4px solid #334155;">
         <h3>🎓 Create Student Account</h3>
         <p style="color: #666; font-size:13px; margin-bottom: 12px;">Create login credentials for students to access the Student Portal.</p>
 
@@ -104,7 +105,28 @@
         <label>Password</label>
         <input id="stuAccPassword" type="password" placeholder="Set initial password">
 
-        <button style="margin-top:15px; background:#4f46e5;" onclick="createStudentAccount()">Create Student Account</button>
+        <button style="margin-top:15px; background:#1e293b;" onclick="createStudentAccount()">Create Student Account</button>
+      </div>
+
+      <!-- Bulk Import Students -->
+      <div class="card" style="max-width:500px; border-left: 4px solid #334155;">
+        <h3>📥 Bulk Import Students</h3>
+        <p style="color: #666; font-size:13px; margin-bottom: 12px;">Upload an Excel file (.xlsx) with student data. Required columns: <strong>Name</strong>, <strong>USN</strong>. Optional: Semester, Mobile Number, Email ID, Department. Default password = USN in lowercase.</p>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px;">
+          <a href="/api/admin/student-import-template" style="text-decoration:none;">
+            <button type="button" style="background: #334155;">📄 Download Template</button>
+          </a>
+        </div>
+        <input type="file" id="bulkImportFile" accept=".xlsx,.xls">
+        <button style="margin-top:10px;" onclick="bulkImportStudents()">Upload & Import</button>
+        <div id="importResult" style="margin-top:12px; font-size:13px; display:none;"></div>
+      </div>
+
+      <!-- Graduated Student Cleanup -->
+      <div class="card" style="max-width:500px; border-left: 4px solid #dc2626;">
+        <h3>🎓 Cleanup Graduated Students</h3>
+        <p style="color: #666; font-size:13px; margin-bottom: 12px;">Remove students who have returned all components. Students with <strong>unreturned items will be kept</strong>.</p>
+        <button style="background: #dc2626;" onclick="cleanupGraduated()">🗑️ Cleanup Graduated Students</button>
       </div>
 
       <!-- Database Backup -->
@@ -114,9 +136,26 @@
           issues). Do this monthly.</p>
         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
           <button onclick="exportDatabase()">Download Backup (JSON)</button>
-          <button onclick="exportDatabasePDF()" style="background: #7c3aed; color: white;">Download Backup
+          <button onclick="exportDatabasePDF()" style="background: #334155; color: white;">Download Backup
             (PDF)</button>
         </div>
+      </div>
+
+      <!-- Auto-Backup Management -->
+      <div class="card" style="max-width:500px; border-left: 4px solid #0891b2;">
+        <h3>🔄 Auto-Backup (In-Database)</h3>
+        <p style="color: #666; font-size:13px; margin-bottom: 12px;">Backups run every 6 hours and are stored inside the database. If the server goes down, restore from any backup on the new server.</p>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px;">
+          <button onclick="triggerBackup()" style="background: #0891b2;">⚡ Create Backup Now</button>
+        </div>
+        <h4 style="margin-bottom:8px; font-size:14px;">Available Backups</h4>
+        <div id="backupList" style="font-size: 13px; color: #64748b;">Loading...</div>
+
+        <hr style="margin: 16px 0;">
+        <h4 style="margin-bottom:8px; font-size:14px;">Restore from File</h4>
+        <p style="color: #666; font-size:12px; margin-bottom: 8px;">Upload a previously downloaded backup JSON to restore all data.</p>
+        <input type="file" id="restoreFile" accept=".json">
+        <button style="margin-top:10px; background: #dc2626;" onclick="restoreFromFile()">⚠️ Restore Database</button>
       </div>
 
     </div>
@@ -307,8 +346,94 @@
 
     loadAdmins();
 
+    // ===== BULK IMPORT STUDENTS =====
+
+    async function bulkImportStudents() {
+      const fileInput = document.getElementById("bulkImportFile");
+      if (!fileInput.files[0]) { showToast("Please select an Excel file", false); return; }
+
+      const formData = new FormData();
+      formData.append("file", fileInput.files[0]);
+
+      showToast("Importing students...");
+      const res = await fetch("/api/admin/bulk-import-students", { method: "POST", body: formData });
+      const data = await res.json();
+
+      const resultDiv = document.getElementById("importResult");
+      resultDiv.style.display = "block";
+      if (data.success) {
+        resultDiv.innerHTML = `<span style="color: #16a34a; font-weight: 600;">✅ ${data.message}</span>`;
+        showToast(data.message);
+        fileInput.value = "";
+      } else {
+        resultDiv.innerHTML = `<span style="color: #dc2626; font-weight: 600;">❌ ${data.message}</span>`;
+        showToast(data.message, false);
+      }
+    }
+
+    // ===== GRADUATED CLEANUP =====
+
+    async function cleanupGraduated() {
+      if (!confirm("⚠️ This will permanently delete all students who have returned all components. Are you sure?")) return;
+      if (!confirm("This action cannot be undone. Create a backup first! Continue?")) return;
+
+      const res = await fetch("/api/admin/cleanup-graduated", { method: "POST", headers: { "Content-Type": "application/json" } });
+      const data = await res.json();
+      showToast(data.message, data.success);
+    }
+
+    // ===== BACKUP MANAGEMENT =====
+
+    async function triggerBackup() {
+      showToast("Creating backup...");
+      const res = await fetch("/api/admin/create-backup", { method: "POST", headers: { "Content-Type": "application/json" } });
+      const data = await res.json();
+      showToast(data.message, data.success);
+      loadBackups();
+    }
+
+    async function loadBackups() {
+      try {
+        const res = await fetch("/api/admin/backups");
+        const data = await res.json();
+        const list = document.getElementById("backupList");
+        if (!data.backups || data.backups.length === 0) {
+          list.innerHTML = "<em>No backups yet. One will be created automatically.</em>";
+          return;
+        }
+        list.innerHTML = data.backups.map(b => {
+          const size = (b.size_bytes / 1024).toFixed(1);
+          return `<div style="display:flex; justify-content:space-between; align-items:center; padding: 6px 0; border-bottom: 1px solid #e2e8f0;">
+            <span><strong>${b.name}</strong><br><small style="color:#94a3b8;">${b.created_at} — ${size} KB</small></span>
+            <a href="/api/admin/backup/${b.id}" style="text-decoration:none;"><button style="padding: 4px 10px; font-size: 12px;">⬇</button></a>
+          </div>`;
+        }).join("");
+      } catch (e) {
+        document.getElementById("backupList").innerHTML = "<em>Error loading backups</em>";
+      }
+    }
+
+    async function restoreFromFile() {
+      const fileInput = document.getElementById("restoreFile");
+      if (!fileInput.files[0]) { showToast("Please select a backup JSON file", false); return; }
+      if (!confirm("⚠️ This will OVERWRITE all current data with the backup. Are you absolutely sure?")) return;
+      if (!confirm("FINAL WARNING: All existing data will be replaced. Continue?")) return;
+
+      const formData = new FormData();
+      formData.append("file", fileInput.files[0]);
+
+      showToast("Restoring database...");
+      const res = await fetch("/api/admin/restore-backup", { method: "POST", body: formData });
+      const data = await res.json();
+      showToast(data.message, data.success);
+      fileInput.value = "";
+    }
+
+    loadBackups();
+
   </script>
 
+<script src="/dark-mode.js"></script>
 </body>
 
 </html>

@@ -4,6 +4,7 @@
 <head>
   <title>Manage Components</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>if(localStorage.getItem("darkMode")=="true")document.documentElement.className="dark"</script>
 </head>
 
 <body>
@@ -51,7 +52,7 @@
       </div>
 
       <!-- Bulk Import Section -->
-      <div class="card" style="border-left: 4px solid #7c3aed;">
+      <div class="card" style="border-left: 4px solid #334155;">
         <h3 style="margin-bottom: 8px;">📥 Bulk Import Components</h3>
         <p style="color: #64748b; font-size: 13px; margin-bottom: 12px;">
           Upload an <strong>Excel (.xlsx, .csv)</strong> or <strong>PDF</strong> file to add components in bulk.<br>
@@ -62,7 +63,7 @@
         </p>
         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
           <input type="file" id="importFile" accept=".xlsx,.csv,.pdf" style="flex: 1; min-width: 200px;">
-          <button onclick="importComponents()" style="background: #7c3aed; color: white; white-space: nowrap;">
+          <button onclick="importComponents()" style="background: #334155; color: white; white-space: nowrap;">
             Upload & Import
           </button>
         </div>
@@ -384,6 +385,7 @@
         }
       </script>
 
+<script src="/dark-mode.js"></script>
 </body>
 
 </html>
