@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <title>Request Queue — CERP</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="/style.css">
-<script>if(localStorage.getItem("darkMode")=="true")document.documentElement.className="dark"</script>
+  <script>if (localStorage.getItem("darkMode") == "true") document.documentElement.className = "dark"</script>
 </head>
+
 <body>
 
   <div class="menu-toggle" onclick="toggleMenu()">☰ Menu</div>
@@ -20,7 +22,7 @@
       <a href="/transactions-page">Transactions</a>
       <a href="/reports-page">Reports</a>
       <a href="/students-page">Students</a>
-      <a href="/student.html">Student Profile</a>
+      <a href="/student_profile.html">Student Profile</a>
       <a href="/admin-requests-page" class="active">Request Queue</a>
       <hr>
       <a href="/admin-settings.html">Admin Settings</a>
@@ -33,15 +35,20 @@
 
     <div class="content">
       <h1>Request Queue</h1>
-      <p style="color:#64748b; margin-top:-16px; margin-bottom:20px; font-size:14px;">Review and manage student component requests</p>
+      <p style="color:#64748b; margin-top:-16px; margin-bottom:20px; font-size:14px;">Review and manage student
+        component requests</p>
 
       <!-- Filter tabs -->
       <div style="display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap;">
         <button onclick="loadRequests('ALL')" class="btn-sm" style="background:#0f172a;" id="fAll">All</button>
-        <button onclick="loadRequests('PENDING')" class="btn-sm" style="background:#f59e0b;" id="fPending">Pending</button>
-        <button onclick="loadRequests('APPROVED')" class="btn-sm" style="background:#16a34a;" id="fApproved">Approved</button>
-        <button onclick="loadRequests('REJECTED')" class="btn-sm" style="background:#dc2626;" id="fRejected">Rejected</button>
-        <button onclick="loadRequests('CONFIRMED')" class="btn-sm" style="background:#0891b2;" id="fConfirmed">Confirmed</button>
+        <button onclick="loadRequests('PENDING')" class="btn-sm" style="background:#f59e0b;"
+          id="fPending">Pending</button>
+        <button onclick="loadRequests('APPROVED')" class="btn-sm" style="background:#16a34a;"
+          id="fApproved">Approved</button>
+        <button onclick="loadRequests('REJECTED')" class="btn-sm" style="background:#dc2626;"
+          id="fRejected">Rejected</button>
+        <button onclick="loadRequests('CONFIRMED')" class="btn-sm" style="background:#0891b2;"
+          id="fConfirmed">Confirmed</button>
       </div>
 
       <div id="requestsList"></div>
@@ -210,7 +217,7 @@
       document.getElementById("rejectModal").classList.remove("active");
     }
 
-    document.getElementById("rejectModal").addEventListener("click", function(e) {
+    document.getElementById("rejectModal").addEventListener("click", function (e) {
       if (e.target === this) closeRejectModal();
     });
 
@@ -247,7 +254,7 @@
       document.getElementById("adminEditModal").classList.remove("active");
     }
 
-    document.getElementById("adminEditModal").addEventListener("click", function(e) {
+    document.getElementById("adminEditModal").addEventListener("click", function (e) {
       if (e.target === this) closeAdminEditModal();
     });
 
@@ -275,6 +282,7 @@
     window.onload = () => loadRequests('PENDING');
   </script>
 
-<script src="/dark-mode.js"></script>
+  <script src="/dark-mode.js"></script>
 </body>
+
 </html>

@@ -5,7 +5,7 @@
   <title>Admin Settings</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="/style.css">
-<script>if(localStorage.getItem("darkMode")=="true")document.documentElement.className="dark"</script>
+  <script>if (localStorage.getItem("darkMode") == "true") document.documentElement.className = "dark"</script>
 </head>
 
 <body>
@@ -23,7 +23,7 @@
       <a href="/transactions-page" id="nav-transactions">Transactions</a>
       <a href="/reports-page" id="nav-reports">Reports</a>
       <a href="/students-page" id="nav-students">Students</a>
-      <a href="/student.html" id="nav-profile">Student Profile</a>
+      <a href="/student_profile.html" id="nav-profile">Student Profile</a>
       <a href="/admin-requests-page" id="nav-requests">Request Queue</a>
 
       <hr>
@@ -88,7 +88,8 @@
       <!-- Create Student Account -->
       <div class="card" style="max-width:400px; border-left: 4px solid #334155;">
         <h3>🎓 Create Student Account</h3>
-        <p style="color: #666; font-size:13px; margin-bottom: 12px;">Create login credentials for students to access the Student Portal.</p>
+        <p style="color: #666; font-size:13px; margin-bottom: 12px;">Create login credentials for students to access the
+          Student Portal.</p>
 
         <label>Name</label>
         <input id="stuAccName" placeholder="Student full name">
@@ -105,13 +106,16 @@
         <label>Password</label>
         <input id="stuAccPassword" type="password" placeholder="Set initial password">
 
-        <button style="margin-top:15px; background:#1e293b;" onclick="createStudentAccount()">Create Student Account</button>
+        <button style="margin-top:15px; background:#1e293b;" onclick="createStudentAccount()">Create Student
+          Account</button>
       </div>
 
       <!-- Bulk Import Students -->
       <div class="card" style="max-width:500px; border-left: 4px solid #334155;">
         <h3>📥 Bulk Import Students</h3>
-        <p style="color: #666; font-size:13px; margin-bottom: 12px;">Upload an Excel file (.xlsx) with student data. Required columns: <strong>Name</strong>, <strong>USN</strong>. Optional: Semester, Mobile Number, Email ID, Department. Default password = USN in lowercase.</p>
+        <p style="color: #666; font-size:13px; margin-bottom: 12px;">Upload an Excel file (.xlsx) with student data.
+          Required columns: <strong>Name</strong>, <strong>USN</strong>. Optional: Semester, Mobile Number, Email ID,
+          Department. Default password = USN in lowercase.</p>
         <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px;">
           <a href="/api/admin/student-import-template" style="text-decoration:none;">
             <button type="button" style="background: #334155;">📄 Download Template</button>
@@ -125,7 +129,8 @@
       <!-- Graduated Student Cleanup -->
       <div class="card" style="max-width:500px; border-left: 4px solid #dc2626;">
         <h3>🎓 Cleanup Graduated Students</h3>
-        <p style="color: #666; font-size:13px; margin-bottom: 12px;">Remove students who have returned all components. Students with <strong>unreturned items will be kept</strong>.</p>
+        <p style="color: #666; font-size:13px; margin-bottom: 12px;">Remove students who have returned all components.
+          Students with <strong>unreturned items will be kept</strong>.</p>
         <button style="background: #dc2626;" onclick="cleanupGraduated()">🗑️ Cleanup Graduated Students</button>
       </div>
 
@@ -144,7 +149,8 @@
       <!-- Auto-Backup Management -->
       <div class="card" style="max-width:500px; border-left: 4px solid #0891b2;">
         <h3>🔄 Auto-Backup (In-Database)</h3>
-        <p style="color: #666; font-size:13px; margin-bottom: 12px;">Backups run every 6 hours and are stored inside the database. If the server goes down, restore from any backup on the new server.</p>
+        <p style="color: #666; font-size:13px; margin-bottom: 12px;">Backups run every 6 hours and are stored inside the
+          database. If the server goes down, restore from any backup on the new server.</p>
         <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px;">
           <button onclick="triggerBackup()" style="background: #0891b2;">⚡ Create Backup Now</button>
         </div>
@@ -153,7 +159,8 @@
 
         <hr style="margin: 16px 0;">
         <h4 style="margin-bottom:8px; font-size:14px;">Restore from File</h4>
-        <p style="color: #666; font-size:12px; margin-bottom: 8px;">Upload a previously downloaded backup JSON to restore all data.</p>
+        <p style="color: #666; font-size:12px; margin-bottom: 8px;">Upload a previously downloaded backup JSON to
+          restore all data.</p>
         <input type="file" id="restoreFile" accept=".json">
         <button style="margin-top:10px; background: #dc2626;" onclick="restoreFromFile()">⚠️ Restore Database</button>
       </div>
@@ -433,7 +440,7 @@
 
   </script>
 
-<script src="/dark-mode.js"></script>
+  <script src="/dark-mode.js"></script>
 </body>
 
 </html>
