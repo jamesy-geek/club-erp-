@@ -603,8 +603,10 @@ tbody tr:hover {
 
 .dark-mode-toggle {
   position: fixed;
-  bottom: 24px;
-  left: 24px;
+  bottom: 80px;
+  right: 24px;
+
+
   width: 44px;
   height: 44px;
   border-radius: 50%;
