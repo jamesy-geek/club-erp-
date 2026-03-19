@@ -2,14 +2,13 @@
 <html>
 
 <head>
-  <title>Student Profile</title>
+  <title>Student Profile — CERP</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/style.css">
   <script>if (localStorage.getItem("darkMode") == "true") document.documentElement.className = "dark"</script>
 </head>
 
 <body>
-
-  <link rel="stylesheet" href="/style.css">
 
   <div class="menu-toggle" onclick="toggleMenu()">
     ☰ Menu
@@ -42,114 +41,142 @@
 
     <div class="content">
       <h1>Student Profile</h1>
+      <p style="color:#64748b; margin-top:-16px; margin-bottom:20px; font-size:15px;">View detailed transaction history for a student</p>
 
-      <div style="margin-bottom:15px;">
-        <input type="text" id="searchUSN" placeholder="Enter USN">
-        <button onclick="loadProfile()">Search</button>
+      <div class="card" style="margin-bottom:20px; display:flex; gap:10px; align-items:center;">
+        <input type="text" id="searchUSN" placeholder="Enter USN (e.g. 4NN22CS001)" style="flex:1; margin-bottom:0;">
+        <button onclick="loadProfile()" style="width:auto;">🔍 Search Profile</button>
       </div>
 
-      <div id="studentInfo" style="margin-bottom:20px;"></div>
+      <div id="studentDetailCard" class="card" style="display:none; border-left: 4px solid #1e293b; margin-bottom:24px;">
+        <h3 id="displayName" style="margin-top:0; color:#1e293b;"></h3>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:15px; font-size:14px; color:#475569;">
+          <div><strong>USN:</strong> <span id="displayUSN"></span></div>
+          <div><strong>Email:</strong> <span id="displayEmail"></span></div>
+          <div><strong>Phone:</strong> <span id="displayPhone"></span></div>
+          <div><strong>Dept:</strong> <span id="displayDept"></span></div>
+        </div>
+      </div>
 
-      <table border="1" cellpadding="8" cellspacing="0" width="100%">
-        <thead>
-          <tr>
-            <th>Timestamp</th>
-            <th>Component</th>
-            <th>Issued</th>
-            <th>Returned</th>
-            <th>Remaining</th>
-          </tr>
-        </thead>
-        <tbody id="profileTable"></tbody>
-      </table>
+      <div class="card">
+        <h3>Transaction History</h3>
+        <div style="overflow-x:auto;">
+          <table width="100%">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Component</th>
+                <th>Issued</th>
+                <th>Returned</th>
+                <th>Balance</th>
+              </tr>
+            </thead>
+            <tbody id="profileTable">
+              <tr>
+                <td colspan="5" style="text-align:center; padding:40px; color:#94a3b8;">Enter a student USN to view history</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-      <div id="profileSummary" style="margin-top:20px; font-weight:bold;"></div>
+      <div id="summaryCard" class="card" style="display:none; background:#f8fafc; border:1px solid #e2e8f0;">
+        <div style="display:flex; justify-content:space-around; text-align:center;">
+          <div><div style="font-size:12px; color:#64748b; text-transform:uppercase;">Total Issued</div><div id="totalIssued" style="font-size:20px; font-weight:700; color:#1e293b;">0</div></div>
+          <div><div style="font-size:12px; color:#64748b; text-transform:uppercase;">Total Returned</div><div id="totalReturned" style="font-size:20px; font-weight:700; color:#1e293b;">0</div></div>
+          <div><div style="font-size:12px; color:#64748b; text-transform:uppercase;">Active Holding</div><div id="totalHolding" style="font-size:20px; font-weight:700; color:#2563eb;">0</div></div>
+        </div>
+      </div>
     </div>
+  </div>
 
-    <script>
-      async function loadProfile() {
+  <div id="toast"></div>
 
-        const usn = document.getElementById("searchUSN").value;
+  <script>
+    function toggleMenu() {
+      document.getElementById("sidebar").classList.toggle("active");
+    }
 
-        const res = await fetch("/student/" + usn, {
-          credentials: "same-origin"
-        });
+    function showToast(message, success = true) {
+      const toast = document.getElementById("toast");
+      toast.className = "toast show";
+      toast.style.background = success ? "#16a34a" : "#dc2626";
+      toast.innerText = message;
+      setTimeout(() => toast.className = "toast", 2500);
+    }
 
+    async function loadProfile() {
+      const usn = document.getElementById("searchUSN").value.trim();
+      if (!usn) return;
+
+      try {
+        const res = await fetch("/student/" + usn, { credentials: "same-origin" });
         const data = await res.json();
-
+        
         const table = document.getElementById("profileTable");
-        const summary = document.getElementById("profileSummary");
+        const detailCard = document.getElementById("studentDetailCard");
+        const summaryCard = document.getElementById("summaryCard");
+
+        if (!data || data.length === 0) {
+          table.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:40px; color:#dc2626;">No data found for USN: ${usn}</td></tr>`;
+          detailCard.style.display = "none";
+          summaryCard.style.display = "none";
+          return;
+        }
+
+        // Show info from the first record
+        detailCard.style.display = "block";
+        summaryCard.style.display = "block";
+        document.getElementById("displayName").textContent = data[0].student_name;
+        document.getElementById("displayUSN").textContent = data[0].usn;
+        document.getElementById("displayEmail").textContent = data[0].email || 'N/A';
+        document.getElementById("displayPhone").textContent = data[0].phone_number || 'N/A';
+        document.getElementById("displayDept").textContent = data[0].department || 'N/A';
 
         table.innerHTML = "";
-
-        let totalIssued = 0;
-        let totalReturned = 0;
+        let totalI = 0;
+        let totalR = 0;
 
         data.forEach(row => {
-
-          totalIssued += row.quantity;
-          totalReturned += row.returned_quantity;
+          totalI += row.quantity;
+          totalR += row.returned_quantity;
+          const remaining = row.quantity - row.returned_quantity;
 
           table.innerHTML += `
-      <tr>
-        <td>${row.issue_timestamp}</td>
-        <td>${row.component_name}</td>
-        <td>${row.quantity}</td>
-        <td>${row.returned_quantity}</td>
-        <td>${row.remaining}</td>
-      </tr>
-    `;
+            <tr>
+              <td>${new Date(row.issue_timestamp).toLocaleDateString()}</td>
+              <td style="font-weight:600; color:#1e293b;">${row.component_name}</td>
+              <td>${row.quantity}</td>
+              <td>${row.returned_quantity}</td>
+              <td style="font-weight:700; color:${remaining > 0 ? '#2563eb' : '#64748b'}">${remaining}</td>
+            </tr>
+          `;
         });
 
-        summary.innerHTML = `
-    Total Issued: ${totalIssued} |
-    Total Returned: ${totalReturned} |
-    Currently Holding: ${totalIssued - totalReturned}
-  `;
+        document.getElementById("totalIssued").textContent = totalI;
+        document.getElementById("totalReturned").textContent = totalR;
+        document.getElementById("totalHolding").textContent = totalI - totalR;
+
+      } catch (err) {
+        showToast("Error loading profile data", false);
       }
-    </script>
+    }
 
-    </script>
+    async function logout() {
+      await fetch("/logout", { method: "POST" });
+      window.location.href = "/login.html";
+    }
 
-    <script>
-      function toggleMenu() {
-        document.getElementById("sidebar").classList.toggle("active");
+    // Auto-load if USN in URL
+    window.onload = () => {
+      const params = new URLSearchParams(window.location.search);
+      const usn = params.get("usn");
+      if (usn) {
+        document.getElementById("searchUSN").value = usn;
+        loadProfile();
       }
-    </script>
-
-    <div id="toast" style="
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  background: #1e293b;
-  color: white;
-  padding: 12px 18px;
-  border-radius: 8px;
-  display: none;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-"></div>
-
-    <script>
-      function showToast(message, success = true) {
-        const toast = document.getElementById("toast");
-        toast.style.background = success ? "#16a34a" : "#dc2626";
-        toast.innerText = message;
-        toast.style.display = "block";
-
-        setTimeout(() => {
-          toast.style.display = "none";
-        }, 2500);
-      }
-    </script>
-
-    <script>
-      async function logout() {
-        await fetch("/logout", { method: "POST" });
-        window.location.href = "/login.html";
-      }
-    </script>
-
-    <script src="/dark-mode.js"></script>
+    };
+  </script>
+  <script src="/dark-mode.js"></script>
 </body>
-
-</html>
+</html>
