@@ -470,9 +470,8 @@ app.get("/components-page", requireAdmin, (req, res) => {
   safeSendFile(res, path.join(__dirname, "public", "components.html"));
 });
 
-app.get("/issue-page", requireAdmin, (req, res) => {
-  safeSendFile(res, path.join(__dirname, "public", "issue.html"));
-});
+// Issue page removed — all issuing now goes through student request → admin approve flow
+
 
 app.get("/transactions-page", requireAdmin, (req, res) => {
   safeSendFile(res, path.join(__dirname, "public", "transactions.html"));
@@ -506,6 +505,11 @@ app.get("/student-catalog", requireStudent, (req, res) => {
 app.get("/student-requests-page", requireStudent, (req, res) => {
   safeSendFile(res, path.join(__dirname, "public", "student-requests.html"));
 });
+
+app.get("/student-my-profile", requireStudent, (req, res) => {
+  safeSendFile(res, path.join(__dirname, "public", "student-my-profile.html"));
+});
+
 
 // ================= COMPONENT ROUTES =================
 
@@ -567,7 +571,8 @@ app.post("/rename-component", requireAdmin, async (req, res) => {
 // ================= ISSUE CREATION =================
 
 app.post("/create-issue", requireAdmin, async (req, res) => {
-  const { student_name, usn, phone, items } = req.body;
+  const { student_name, usn: rawUsn, phone, items } = req.body;
+  const usn = (rawUsn || '').toUpperCase();
   if (!items || items.length === 0) return res.json({ message: "No items provided" });
 
   try {
@@ -696,6 +701,12 @@ app.get("/student/:usn", async (req, res) => {
   const result = await db.execute({
     sql: `
       SELECT 
+        students.student_name,
+        students.usn,
+        students.phone,
+        students.email,
+        students.semester,
+        students.department,
         issues.issue_timestamp,
         components.name AS component_name,
         issue_items.quantity,
@@ -709,14 +720,36 @@ app.get("/student/:usn", async (req, res) => {
       ORDER BY issues.issue_timestamp DESC
     `, args: [req.params.usn]
   });
-  res.json(result.rows);
+
+  // If no transactions found, try to get just the student info
+  if (result.rows.length === 0) {
+    const studentInfo = await db.execute({
+      sql: "SELECT student_name, usn, phone, email, semester, department FROM students WHERE usn = ?",
+      args: [req.params.usn]
+    });
+    if (studentInfo.rows.length > 0) {
+      const s = studentInfo.rows[0];
+      // Return a "dummy" row with just info so header populates
+      return res.json([{ 
+        ...s, 
+        usn: s.usn.toUpperCase(), 
+        is_empty: true 
+      }]);
+    }
+  }
+
+  const rows = result.rows.map(r => ({ ...r, usn: r.usn.toUpperCase() }));
+  res.json(rows);
 });
+
 
 // ================= STUDENTS DIRECTORY =================
 
 app.get("/students", requireAdmin, async (req, res) => {
   const result = await db.execute("SELECT * FROM students ORDER BY student_name ASC");
-  res.json(result.rows);
+  // Force USN uppercase in output
+  const rows = result.rows.map(r => ({ ...r, usn: (r.usn || '').toUpperCase() }));
+  res.json(rows);
 });
 
 app.post("/edit-student", requireAdmin, async (req, res) => {
@@ -1304,9 +1337,10 @@ app.post("/student-logout", (req, res) => {
 
 app.get("/student-session", requireStudent, async (req, res) => {
   try {
-    const result = await db.execute({ sql: "SELECT id, student_name, usn, email, phone FROM students WHERE id = ?", args: [req.session.student_id] });
+    const result = await db.execute({ sql: "SELECT id, student_name, usn, email, phone, semester, department FROM students WHERE id = ?", args: [req.session.student_id] });
     if (result.rows.length === 0) return res.status(404).json({ message: "Student not found" });
-    res.json(result.rows[0]);
+    const student = { ...result.rows[0], usn: (result.rows[0].usn || '').toUpperCase() };
+    res.json(student);
   } catch (err) {
     res.status(500).json({ message: "Server error" });
   }
@@ -1656,8 +1690,10 @@ app.post("/api/admin/bulk-import-students", requireAdmin, upload.single("file"),
       }
     }
 
-    if (!colMap.name || !colMap.usn) {
-      return res.json({ success: false, message: "Excel must have at least 'Name' and 'USN' columns" });
+    const requiredFields = ['name', 'usn', 'phone', 'email', 'semester', 'department'];
+    const missingCols = requiredFields.filter(f => !colMap[f]);
+    if (missingCols.length > 0) {
+      return res.json({ success: false, message: `Excel is missing required columns: ${missingCols.join(', ')}. All 6 fields (Name, USN, Phone, Email, Semester, Department) are required.` });
     }
 
     let created = 0, updated = 0, errors = [];
@@ -1666,13 +1702,16 @@ app.post("/api/admin/bulk-import-students", requireAdmin, upload.single("file"),
     for (let r = 2; r <= sheet.actualRowCount; r++) {
       const row = sheet.getRow(r);
       const name = String(row.getCell(colMap.name).value || "").trim();
-      const usn = String(row.getCell(colMap.usn).value || "").trim();
-      if (!name || !usn) continue;
+      let usn = String(row.getCell(colMap.usn).value || "").trim().toUpperCase();
+      const phone = String(row.getCell(colMap.phone).value || "").trim();
+      const email = String(row.getCell(colMap.email).value || "").trim();
+      const semester = String(row.getCell(colMap.semester).value || "").trim();
+      const department = String(row.getCell(colMap.department).value || "").trim();
 
-      const phone = colMap.phone ? String(row.getCell(colMap.phone).value || "").trim() : "";
-      const email = colMap.email ? String(row.getCell(colMap.email).value || "").trim() : "";
-      const semester = colMap.semester ? String(row.getCell(colMap.semester).value || "").trim() : "";
-      const department = colMap.department ? String(row.getCell(colMap.department).value || "").trim() : "";
+      if (!name || !usn || !phone || !email || !semester || !department) {
+        errors.push(`Row ${r}: Missing required field(s)`);
+        continue;
+      }
       const password = await bcrypt.hash(usn.toLowerCase(), 10);
 
       try {

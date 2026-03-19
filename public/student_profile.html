@@ -21,8 +21,8 @@
 
       <a href="/" id="nav-dashboard">Dashboard</a>
       <a href="/components-page" id="nav-components">Components</a>
-      <a href="/issue-page" id="nav-issue">Issue</a>
       <a href="/transactions-page" id="nav-transactions">Transactions</a>
+
       <a href="/reports-page" id="nav-reports">Reports</a>
       <a href="/students-page" id="nav-students">Students</a>
       <a href="/student_profile.html" id="nav-profile" class="active">Student Profile</a>
@@ -50,12 +50,14 @@
 
       <div id="studentDetailCard" class="card" style="display:none; border-left: 4px solid #1e293b; margin-bottom:24px;">
         <h3 id="displayName" style="margin-top:0; color:#1e293b;"></h3>
-        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:15px; font-size:14px; color:#475569;">
-          <div><strong>USN:</strong> <span id="displayUSN"></span></div>
-          <div><strong>Email:</strong> <span id="displayEmail"></span></div>
-          <div><strong>Phone:</strong> <span id="displayPhone"></span></div>
-          <div><strong>Dept:</strong> <span id="displayDept"></span></div>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:15px; font-size:14px; color:#475569;">
+          <div><strong style="color: #64748b; font-size:12px; text-transform:uppercase;">USN</strong><br><span id="displayUSN" style="font-weight:600; font-size:16px; color:#1e293b;"></span></div>
+          <div><strong style="color: #64748b; font-size:12px; text-transform:uppercase;">Email</strong><br><span id="displayEmail"></span></div>
+          <div><strong style="color: #64748b; font-size:12px; text-transform:uppercase;">Phone</strong><br><span id="displayPhone"></span></div>
+          <div><strong style="color: #64748b; font-size:12px; text-transform:uppercase;">Semester</strong><br><span id="displaySem"></span></div>
+          <div><strong style="color: #64748b; font-size:12px; text-transform:uppercase;">Department</strong><br><span id="displayDept"></span></div>
         </div>
+
       </div>
 
       <div class="card">
@@ -128,16 +130,25 @@
         detailCard.style.display = "block";
         summaryCard.style.display = "block";
         document.getElementById("displayName").textContent = data[0].student_name;
-        document.getElementById("displayUSN").textContent = data[0].usn;
+        document.getElementById("displayUSN").textContent = (data[0].usn || '').toUpperCase();
         document.getElementById("displayEmail").textContent = data[0].email || 'N/A';
-        document.getElementById("displayPhone").textContent = data[0].phone_number || 'N/A';
+        document.getElementById("displayPhone").textContent = data[0].phone || 'N/A';
+        document.getElementById("displaySem").textContent = data[0].semester || 'N/A';
         document.getElementById("displayDept").textContent = data[0].department || 'N/A';
 
-        table.innerHTML = "";
-        let totalI = 0;
-        let totalR = 0;
+        if (data[0].is_empty) {
+          table.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:40px; color:#64748b;">No transaction history found for this student.</td></tr>`;
+          document.getElementById("totalIssued").textContent = "0";
+          document.getElementById("totalReturned").textContent = "0";
+          document.getElementById("totalHolding").textContent = "0";
+          return;
+        }
 
+        table.innerHTML = "";
+        let totalI = 0, totalR = 0;
         data.forEach(row => {
+          // Skip if missing transaction data
+          if (!row.issue_timestamp) return;
           totalI += row.quantity;
           totalR += row.returned_quantity;
           const remaining = row.quantity - row.returned_quantity;

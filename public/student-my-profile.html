@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>My Profile — CERP</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/style.css">
+<script>if(localStorage.getItem("darkMode")=="true")document.documentElement.className="dark"</script>
+</head>
+<body>
+
+  <div class="menu-toggle" onclick="toggleMenu()">☰ Menu</div>
+
+  <div class="layout">
+
+    <div class="sidebar student-sidebar" id="sidebar">
+      <h2><img src="/ennovate-logo.png" alt=""> CERP</h2>
+      <a href="/student-dashboard">Dashboard</a>
+      <a href="/student-catalog">Catalog</a>
+      <a href="/student-requests-page">My Requests</a>
+      <a href="/student-my-profile" class="active">My Profile</a>
+      <hr>
+      <a href="#" onclick="logout()">Logout</a>
+      <div class="sidebar-footer">
+        <img src="/ennovate-logo.png" alt="">
+        <span>Student Portal</span>
+        <span style="display:block; margin-top:8px; opacity:0.8; font-size:9px;">Built by Jishnu Abbhay D</span>
+      </div>
+    </div>
+
+    <div class="content">
+      <h1>My Profile</h1>
+      <p style="color:#64748b; margin-top:-16px; margin-bottom:20px; font-size:15px;">Your account details</p>
+
+      <div class="card" style="border-left: 4px solid #1e293b;">
+        <div id="profileDetails" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:20px;">
+          <p style="color:#94a3b8; font-size:13px;">Loading...</p>
+        </div>
+      </div>
+
+      <footer style="margin-top:60px; text-align:center; padding-bottom:20px; color:#94a3b8; font-size:11px;">
+        Built by Jishnu Abbhay D
+      </footer>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    function toggleMenu() {
+      document.getElementById("sidebar").classList.toggle("active");
+    }
+
+    function showToast(message, success = true) {
+      const toast = document.getElementById("toast");
+      toast.style.background = success ? "#16a34a" : "#dc2626";
+      toast.innerText = message;
+      toast.style.display = "block";
+      setTimeout(() => toast.style.display = "none", 2500);
+    }
+
+    async function logout() {
+      await fetch("/student-logout", { method: "POST" });
+      window.location.href = "/student-login.html";
+    }
+
+    async function loadProfile() {
+      try {
+        const res = await fetch("/student-session", { credentials: "same-origin" });
+        if (res.status === 401) { window.location.href = "/student-login.html"; return; }
+        const student = await res.json();
+
+        const fields = [
+          { label: "Full Name", value: student.student_name, icon: "👤" },
+          { label: "USN", value: (student.usn || '').toUpperCase(), icon: "🎓" },
+          { label: "Email", value: student.email || "N/A", icon: "📧" },
+          { label: "Phone", value: student.phone || "N/A", icon: "📞" },
+          { label: "Semester", value: student.semester || "N/A", icon: "📅" },
+          { label: "Department", value: student.department || "N/A", icon: "🏛️" }
+        ];
+
+        document.getElementById("profileDetails").innerHTML = fields.map(f => `
+          <div style="background:#f8fafc; padding:16px; border-radius:10px;">
+            <div style="font-size:11px; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">${f.icon} ${f.label}</div>
+            <div style="font-size:16px; font-weight:600; color:#1e293b;">${f.value}</div>
+          </div>
+        `).join('');
+      } catch (e) {
+        window.location.href = "/student-login.html";
+      }
+    }
+
+    window.onload = loadProfile;
+  </script>
+
+<script src="/dark-mode.js"></script>
+</body>
+</html>
