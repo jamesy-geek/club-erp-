@@ -42,6 +42,73 @@
 
       <h1>Admin Settings</h1>
 
+      <!-- NEW: CLUB PROFILE -->
+      <div class="card" style="border-left: 4px solid #2563eb;">
+        <h3>🏢 Club Profile</h3>
+        <p style="color: #64748b; font-size:13px; margin-bottom: 15px;">Customize the identity of your ERP.</p>
+        
+        <label>Club Name</label>
+        <input type="text" id="set_club_name" placeholder="e.g. Club Ennovate">
+        
+        <label style="margin-top:10px;">Dashboard Tagline</label>
+        <input type="text" id="set_club_tagline" placeholder="Short description for dashboard">
+        
+        <button style="margin-top:15px; background: #2563eb;" onclick="saveGroup(['club_name','club_tagline'])">Save Profile</button>
+      </div>
+
+      <!-- NEW: INVENTORY & STOCK -->
+      <div class="card" style="border-left: 4px solid #059669;">
+        <h3>📦 Inventory & Stock Control</h3>
+        <p style="color: #64748b; font-size:13px; margin-bottom: 15px;">Configure thresholds and borrow limits.</p>
+        
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+          <div>
+            <label>Low Stock Threshold</label>
+            <input type="number" id="set_low_stock_threshold" placeholder="5">
+          </div>
+          <div>
+            <label>Max Borrow Qty / Item</label>
+            <input type="number" id="set_max_borrow_quantity" placeholder="5">
+          </div>
+        </div>
+        
+        <div style="margin-top:15px;">
+          <label style="display:flex; align-items:center; cursor:pointer;">
+            <input type="checkbox" id="set_allow_out_of_stock_requests" style="width:auto; margin-right:10px;">
+            <span style="font-size:14px;">Allow Students to request Out-of-Stock items</span>
+          </label>
+        </div>
+        
+        <button style="margin-top:15px; background: #059669;" onclick="saveGroup(['low_stock_threshold','max_borrow_quantity','allow_out_of_stock_requests'])">Save Inventory Settings</button>
+      </div>
+
+      <!-- NEW: SECURITY & MAINTENANCE -->
+      <div class="card" style="border-left: 4px solid #7c3aed;">
+        <h3>🔐 Security & Maintenance</h3>
+        <p style="color: #64748b; font-size:13px; margin-bottom: 15px;">Manage login policy and backup frequency.</p>
+        
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+          <div>
+            <label>Max Login Attempts</label>
+            <input type="number" id="set_max_login_attempts" placeholder="10">
+          </div>
+          <div>
+            <label>Lockout Duration (min)</label>
+            <input type="number" id="set_login_lockout_minutes" placeholder="15">
+          </div>
+          <div>
+            <label>Auto-Backup Every (hours)</label>
+            <input type="number" id="set_auto_backup_interval_hours" placeholder="6">
+          </div>
+          <div>
+            <label>Max Backups to Keep</label>
+            <input type="number" id="set_max_backups_to_keep" placeholder="10">
+          </div>
+        </div>
+        
+        <button style="margin-top:15px; background: #7c3aed;" onclick="saveGroup(['max_login_attempts','login_lockout_minutes','auto_backup_interval_hours','max_backups_to_keep'])">Save System Settings</button>
+      </div>
+
       <!-- Update Your Credentials -->
       <div class="card" style="max-width:400px;">
 
@@ -350,7 +417,51 @@
       }
     }
 
-    loadAdmins();
+    // ===== DYNAMIC SETTINGS =====
+
+    async function loadSettings() {
+      try {
+        const res = await fetch("/api/admin/settings");
+        const settings = await res.json();
+        
+        Object.entries(settings).forEach(([key, value]) => {
+          const el = document.getElementById("set_" + key);
+          if (el) {
+            if (el.type === "checkbox") el.checked = value === "true";
+            else el.value = value;
+          }
+        });
+      } catch (err) {
+        console.error("Failed to load settings");
+      }
+    }
+
+    async function saveGroup(keys) {
+      const payload = {};
+      keys.forEach(k => {
+        const el = document.getElementById("set_" + k);
+        if (el.type === "checkbox") payload[k] = el.checked ? "true" : "false";
+        else payload[k] = el.value;
+      });
+
+      showToast("Saving settings...");
+      const res = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      showToast(data.message, data.success);
+      if (data.success) loadSettings();
+    }
+
+    async function initPage() {
+      loadAdmins();
+      loadBackups();
+      loadSettings();
+    }
+
+    window.onload = initPage;
 
     // ===== BULK IMPORT STUDENTS =====
 

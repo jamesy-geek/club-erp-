@@ -7,8 +7,8 @@ const helmet = require("helmet");
 const PDFDocument = require("pdfkit-table");
 const ExcelJS = require("exceljs");
 const crypto = require("crypto");
-const nodemailer = require("nodemailer");
 const multer = require("multer");
+
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 
@@ -168,11 +168,7 @@ function requireStudent(req, res, next) {
 
 // ================= DATABASE SETUP =================
 
-async function initDatabase() {
-  // Drop and recreate sessions table to fix schema mismatches
-  // (sessions are transient — users just re-login)
-  // Removed DROP TABLE IF EXISTS sessions to prevent logout on serverless cold starts
-
+  async function initDatabase() {
   await db.execute(`CREATE TABLE IF NOT EXISTS sessions (
     sid TEXT PRIMARY KEY,
     data TEXT,
@@ -201,13 +197,11 @@ async function initDatabase() {
     phone TEXT
   )`);
 
-  // Add new columns to students if they don't exist
   try { await db.execute(`ALTER TABLE students ADD COLUMN email TEXT`); } catch (e) { /* column exists */ }
   try { await db.execute(`ALTER TABLE students ADD COLUMN password TEXT`); } catch (e) { /* column exists */ }
   try { await db.execute(`ALTER TABLE students ADD COLUMN semester TEXT`); } catch (e) { /* column exists */ }
   try { await db.execute(`ALTER TABLE students ADD COLUMN department TEXT`); } catch (e) { /* column exists */ }
 
-  // Backups table (stores full DB snapshots as JSON)
   await db.execute(`CREATE TABLE IF NOT EXISTS backups (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -223,7 +217,6 @@ async function initDatabase() {
     FOREIGN KEY(student_id) REFERENCES students(id)
   )`);
 
-  // Add request_id column to issues if it doesn't exist
   try { await db.execute(`ALTER TABLE issues ADD COLUMN request_id INTEGER`); } catch (e) { /* column exists */ }
 
   await db.execute(`CREATE TABLE IF NOT EXISTS issue_items (
@@ -236,7 +229,6 @@ async function initDatabase() {
     FOREIGN KEY(component_id) REFERENCES components(id)
   )`);
 
-  // Component requests table (Student Request Portal)
   await db.execute(`CREATE TABLE IF NOT EXISTS component_requests (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     student_id INTEGER NOT NULL,
@@ -258,14 +250,63 @@ async function initDatabase() {
     FOREIGN KEY(component_id) REFERENCES components(id)
   )`);
 
-  // Ensure default admin exists and reset password to 'admin123'
+  // Settings table
+  await db.execute(`CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT,
+    updated_at DATETIME DEFAULT (datetime('now', '+5 hours', '+30 minutes'))
+  )`);
+
+  // Default Settings Seed
+  const defaultSettings = [
+    { k: 'club_name', v: 'CERP' },
+    { k: 'club_tagline', v: 'Club ERP — Manage your club\'s inventory' },
+    { k: 'low_stock_threshold', v: '5' },
+    { k: 'max_borrow_quantity', v: '5' },
+    { k: 'allow_out_of_stock_requests', v: 'false' },
+    { k: 'session_timeout_hours', v: '24' },
+    { k: 'max_login_attempts', v: '10' },
+    { k: 'login_lockout_minutes', v: '15' },
+    { k: 'auto_backup_interval_hours', v: '6' },
+    { k: 'max_backups_to_keep', v: '10' },
+    { k: 'student_self_registration', v: 'false' }
+  ];
+
+  for (const s of defaultSettings) {
+    await db.execute({
+      sql: "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
+      args: [s.k, s.v]
+    });
+  }
+
   const hashed = await bcrypt.hash("admin123", 10);
   await db.execute({
     sql: "INSERT INTO admins (username, password) VALUES (?, ?) ON CONFLICT(username) DO UPDATE SET password = excluded.password",
     args: ["admin", hashed]
   });
   console.log("Default admin updated/created → admin / admin123");
+}
 
+// ================= SETTINGS HELPER =================
+
+let settingsCache = {};
+let lastFetch = 0;
+
+async function getSettings() {
+  const now = Date.now();
+  if (now - lastFetch < 60000 && Object.keys(settingsCache).length > 0) return settingsCache;
+
+  try {
+    const result = await db.execute("SELECT key, value FROM settings");
+    const settings = {};
+    result.rows.forEach(r => settings[r.key] = r.value);
+    settingsCache = settings;
+    lastFetch = now;
+    return settings;
+  } catch (err) {
+    console.error("Error fetching settings:", err);
+    return settingsCache; // Return stale cache on error
+  }
 }
 
 // Database ready flag
@@ -615,6 +656,40 @@ app.post("/create-issue", requireAdmin, async (req, res) => {
   }
 });
 
+// ================= PUBLIC SETTINGS =================
+
+app.get("/api/public/settings", async (req, res) => {
+  const settings = await getSettings();
+  res.json({
+    club_name: settings.club_name,
+    club_tagline: settings.club_tagline
+  });
+});
+
+// ================= SETTINGS ROUTES =================
+
+app.get("/api/admin/settings", requireAdmin, async (req, res) => {
+  const settings = await getSettings();
+  res.json(settings);
+});
+
+app.put("/api/admin/settings", requireAdmin, async (req, res) => {
+  const updates = req.body;
+  try {
+    for (const [key, value] of Object.entries(updates)) {
+      await db.execute({
+        sql: "UPDATE settings SET value = ?, updated_at = datetime('now', '+5 hours', '+30 minutes') WHERE key = ?",
+        args: [String(value), key]
+      });
+    }
+    lastFetch = 0; // Invalidate cache
+    res.json({ success: true, message: "Settings updated successfully" });
+  } catch (err) {
+    console.error("Update settings error:", err);
+    res.status(500).json({ success: false, message: "Error updating settings" });
+  }
+});
+
 // ================= RETURN SINGLE =================
 
 app.post("/return-item", requireAdmin, async (req, res) => {
@@ -780,12 +855,20 @@ app.post("/delete-student", requireAdmin, async (req, res) => {
 
 app.get("/dashboard-summary", requireAdmin, async (req, res) => {
   try {
+    const settings = await getSettings();
+    const threshold = parseInt(settings.low_stock_threshold || '5');
+
     const comp = await db.execute("SELECT COUNT(*) AS total_components FROM components");
     const out = await db.execute("SELECT COALESCE(SUM(quantity - returned_quantity), 0) AS total_out FROM issue_items");
     const stud = await db.execute("SELECT COUNT(*) AS total_students FROM students");
-    const lowStock = await db.execute("SELECT name, available_quantity FROM components WHERE available_quantity < 5 ORDER BY available_quantity ASC");
+    const lowStock = await db.execute({
+      sql: "SELECT name, available_quantity FROM components WHERE available_quantity < ? ORDER BY available_quantity ASC",
+      args: [threshold]
+    });
 
     res.json({
+      club_name: settings.club_name,
+      club_tagline: settings.club_tagline,
       total_components: comp.rows[0].total_components || 0,
       total_out: out.rows[0].total_out || 0,
       total_students: stud.rows[0].total_students || 0,
@@ -1209,100 +1292,8 @@ app.get("/download-report-excel", requireAdmin, async (req, res) => {
   res.end();
 });
 
-// ================= EMAIL SERVICE =================
-
-let emailTransporter = null;
-
-function getEmailTransporter() {
-  if (emailTransporter) return emailTransporter;
-  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
-    emailTransporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT) || 587,
-      secure: (process.env.SMTP_PORT === '465'),
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-      }
-    });
-    return emailTransporter;
-  }
-  return null;
-}
-
-async function sendEmail(to, subject, htmlBody) {
-  const transporter = getEmailTransporter();
-  const from = process.env.SMTP_FROM || '"CERP — Club Ennovate" <noreply@cerp.club>';
-  if (!transporter) {
-    console.log("=== EMAIL (no SMTP configured, logging instead) ===");
-    console.log(`To: ${to}`);
-    console.log(`Subject: ${subject}`);
-    console.log(`Body: ${htmlBody.substring(0, 200)}...`);
-    console.log("===================================================");
-    return;
-  }
-  try {
-    await transporter.sendMail({ from, to, subject, html: htmlBody });
-    console.log(`Email sent to ${to}: ${subject}`);
-  } catch (err) {
-    console.error("Email send error:", err.message);
-  }
-}
-
-function buildApprovalEmailHtml(studentName, componentName, quantity, confirmUrl) {
-  return `
-    <div style="font-family: 'Segoe UI', sans-serif; max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.08);">
-      <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 24px 32px;">
-        <h1 style="color: #ffffff; font-size: 22px; margin: 0;">CERP</h1>
-        <p style="color: rgba(255,255,255,0.7); font-size: 13px; margin: 4px 0 0;">Club Ennovate Resource Portal</p>
-      </div>
-      <div style="padding: 28px 32px;">
-        <h2 style="color: #0f172a; font-size: 18px; margin: 0 0 16px;">Your request has been approved! ✅</h2>
-        <p style="color: #475569; font-size: 14px; line-height: 1.6;">Hi <strong>${studentName}</strong>,</p>
-        <p style="color: #475569; font-size: 14px; line-height: 1.6;">Your component request has been approved by the admin.</p>
-        <div style="background: #f1f5f9; border-radius: 8px; padding: 16px; margin: 16px 0;">
-          <p style="margin: 0; color: #334155;"><strong>Component:</strong> ${componentName}</p>
-          <p style="margin: 4px 0 0; color: #334155;"><strong>Quantity:</strong> ${quantity}</p>
-        </div>
-        <p style="color: #475569; font-size: 14px;">Please collect the component from the lab and confirm receipt:</p>
-        <div style="text-align: center; margin: 24px 0;">
-          <a href="${confirmUrl}" style="background: #0f172a; color: #ffffff; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block;">Confirm Receipt</a>
-        </div>
-        <p style="color: #94a3b8; font-size: 12px;">This link expires in 7 days.</p>
-      </div>
-      <div style="background: #f8fafc; padding: 16px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
-        <p style="color: #94a3b8; font-size: 11px; margin: 0;">CERP — Club Ennovate | Auto-generated notification</p>
-      </div>
-    </div>
-  `;
-}
-
-function buildRejectionEmailHtml(studentName, componentName, quantity, reason) {
-  return `
-    <div style="font-family: 'Segoe UI', sans-serif; max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.08);">
-      <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 24px 32px;">
-        <h1 style="color: #ffffff; font-size: 22px; margin: 0;">CERP</h1>
-        <p style="color: rgba(255,255,255,0.7); font-size: 13px; margin: 4px 0 0;">Club Ennovate Resource Portal</p>
-      </div>
-      <div style="padding: 28px 32px;">
-        <h2 style="color: #0f172a; font-size: 18px; margin: 0 0 16px;">Update on your component request</h2>
-        <p style="color: #475569; font-size: 14px; line-height: 1.6;">Hi <strong>${studentName}</strong>,</p>
-        <p style="color: #475569; font-size: 14px; line-height: 1.6;">Unfortunately, your request could not be approved at this time.</p>
-        <div style="background: #fef2f2; border-radius: 8px; padding: 16px; margin: 16px 0; border-left: 4px solid #ef4444;">
-          <p style="margin: 0; color: #334155;"><strong>Component:</strong> ${componentName}</p>
-          <p style="margin: 4px 0 0; color: #334155;"><strong>Quantity:</strong> ${quantity}</p>
-          ${reason ? `<p style="margin: 8px 0 0; color: #dc2626;"><strong>Reason:</strong> ${reason}</p>` : ''}
-        </div>
-        <p style="color: #475569; font-size: 14px;">You may submit a new request or contact the admin for more information.</p>
-      </div>
-      <div style="background: #f8fafc; padding: 16px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
-        <p style="color: #94a3b8; font-size: 11px; margin: 0;">CERP — Club Ennovate | Auto-generated notification</p>
-      </div>
-    </div>
-  `;
-}
-
 // ================= STUDENT AUTH ROUTES =================
+
 
 app.post("/student-login", loginRateLimiter, async (req, res) => {
   const { email, password } = req.body;
@@ -1343,6 +1334,27 @@ app.get("/student-session", requireStudent, async (req, res) => {
     res.json(student);
   } catch (err) {
     res.status(500).json({ message: "Server error" });
+  }
+});
+
+app.post("/api/student/change-password", requireStudent, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) return res.json({ success: false, message: "Both fields required" });
+
+  try {
+    const sResult = await db.execute({ sql: "SELECT password FROM students WHERE id = ?", args: [req.session.student_id] });
+    if (sResult.rows.length === 0) return res.json({ success: false, message: "Student not found" });
+
+    const student = sResult.rows[0];
+    const match = await bcrypt.compare(currentPassword, student.password);
+    if (!match) return res.json({ success: false, message: "Current password incorrect" });
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await db.execute({ sql: "UPDATE students SET password = ? WHERE id = ?", args: [hashed, req.session.student_id] });
+    res.json({ success: true, message: "Password updated successfully" });
+  } catch (err) {
+    console.error("Change password error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
@@ -1399,8 +1411,21 @@ app.post("/api/student/request", requireStudent, async (req, res) => {
   const { component_id, quantity, purpose_note } = req.body;
   if (!component_id || !quantity || quantity < 1) return res.json({ success: false, message: "Invalid request" });
   try {
+    const settings = await getSettings();
+    const maxQty = parseInt(settings.max_borrow_quantity || '5');
+    const allowOutOfStock = settings.allow_out_of_stock_requests === 'true';
+
+    if (quantity > maxQty) {
+      return res.json({ success: false, message: `Request exceeds limit. Max allowed is ${maxQty} per item.` });
+    }
+
     const comp = await db.execute({ sql: "SELECT * FROM components WHERE id = ?", args: [component_id] });
     if (comp.rows.length === 0) return res.json({ success: false, message: "Component not found" });
+
+    if (!allowOutOfStock && comp.rows[0].available_quantity < quantity) {
+      return res.json({ success: false, message: `Insufficient stock. Only ${comp.rows[0].available_quantity} available.` });
+    }
+
     await db.execute({
       sql: `INSERT INTO component_requests (student_id, component_id, quantity, purpose_note, status) VALUES (?, ?, ?, ?, 'PENDING')`,
       args: [req.session.student_id, component_id, quantity, purpose_note || null]
@@ -1515,17 +1540,8 @@ app.post("/api/admin/requests/:id/approve", requireAdmin, async (req, res) => {
     await db.execute({ sql: "INSERT INTO issue_items (issue_id, component_id, quantity) VALUES (?, ?, ?)", args: [issue_id, request.component_id, request.quantity] });
     // Decrement stock
     await db.execute({ sql: "UPDATE components SET available_quantity = available_quantity - ? WHERE id = ?", args: [request.quantity, request.component_id] });
-    // Send approval email
-    const baseUrl = req.protocol + '://' + req.get('host');
-    const confirmUrl = `${baseUrl}/confirm-receipt.html?token=${token}`;
-    if (request.email) {
-      await sendEmail(
-        request.email,
-        'CERP: Your component request has been approved',
-        buildApprovalEmailHtml(request.student_name, request.component_name, request.quantity, confirmUrl)
-      );
-    }
     res.json({ success: true, message: "Request approved" });
+
   } catch (err) {
     console.error("Approve error:", err);
     res.json({ success: false, message: "Error approving request" });
@@ -1543,14 +1559,8 @@ app.post("/api/admin/requests/:id/reject", requireAdmin, async (req, res) => {
       sql: `UPDATE component_requests SET status = 'REJECTED', admin_id = ?, rejection_reason = ?, updated_at = datetime('now', '+5 hours', '+30 minutes') WHERE id = ?`,
       args: [req.session.admin, reason || null, req.params.id]
     });
-    if (request.email) {
-      await sendEmail(
-        request.email,
-        'CERP: Update on your component request',
-        buildRejectionEmailHtml(request.student_name, request.component_name, request.quantity, reason)
-      );
-    }
     res.json({ success: true, message: "Request rejected" });
+
   } catch (err) {
     console.error("Reject error:", err);
     res.json({ success: false, message: "Error rejecting request" });
@@ -1787,7 +1797,7 @@ app.post("/api/admin/cleanup-graduated", requireAdmin, async (req, res) => {
 
 async function createBackup(name) {
   try {
-    const tables = ['admins', 'components', 'students', 'issues', 'issue_items', 'component_requests'];
+    const tables = ['admins', 'components', 'students', 'issues', 'issue_items', 'component_requests', 'settings'];
     const backup = {};
     for (const table of tables) {
       try {
@@ -1800,8 +1810,16 @@ async function createBackup(name) {
     const data = JSON.stringify(backup);
     await db.execute({ sql: "INSERT INTO backups (name, data) VALUES (?, ?)", args: [name, data] });
 
-    // Keep only last 10 backups
-    const old = await db.execute("SELECT id FROM backups ORDER BY created_at DESC LIMIT -1 OFFSET 10");
+    // Retention Policy
+    const settings = await getSettings();
+    const keep = parseInt(settings.max_backups_to_keep || '10');
+    
+    // Find old backups to delete (offset by 'keep' count)
+    const old = await db.execute({
+      sql: `SELECT id FROM backups ORDER BY created_at DESC LIMIT -1 OFFSET ?`,
+      args: [keep]
+    });
+    
     for (const row of old.rows) {
       await db.execute({ sql: "DELETE FROM backups WHERE id = ?", args: [row.id] });
     }
@@ -1814,12 +1832,23 @@ async function createBackup(name) {
   }
 }
 
-// Schedule auto-backup every 6 hours
-setInterval(async () => {
-  if (!dbReady) return;
-  const now = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  await createBackup(`auto_${now}`);
-}, 6 * 60 * 60 * 1000);
+// Scheduled auto-backup
+let backupIntervalId = null;
+async function refreshBackupSchedule() {
+  if (backupIntervalId) clearInterval(backupIntervalId);
+
+  const settings = await getSettings();
+  const hours = parseInt(settings.auto_backup_interval_hours || '6');
+
+  backupIntervalId = setInterval(async () => {
+    if (!dbReady) return;
+    const now = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    await createBackup(`auto_${now}`);
+  }, hours * 60 * 60 * 1000);
+}
+
+// Start initial schedule
+setTimeout(() => refreshBackupSchedule(), 5000);
 
 // Create first backup on startup (after 30s delay)
 setTimeout(async () => {

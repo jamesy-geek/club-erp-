@@ -37,6 +37,20 @@
         </div>
       </div>
 
+      <!-- NEW: CHANGE PASSWORD -->
+      <div class="card" style="max-width:400px; margin-top:30px; border-left: 4px solid #ef4444;">
+        <h3>🔒 Change Password</h3>
+        <p style="color:#64748b; font-size:13px; margin-bottom:15px;">Secure your account with a new password.</p>
+        
+        <label>Current Password</label>
+        <input type="password" id="currentPassword" placeholder="Enter current password">
+        
+        <label style="margin-top:10px;">New Password</label>
+        <input type="password" id="newPassword" placeholder="Enter new password">
+        
+        <button style="margin-top:15px; background:#ef4444;" onclick="changePassword()">Update Password</button>
+      </div>
+
       <footer style="margin-top:60px; text-align:center; padding-bottom:20px; color:#94a3b8; font-size:11px;">
         Built by Jishnu Abbhay D
       </footer>
@@ -86,6 +100,30 @@
         `).join('');
       } catch (e) {
         window.location.href = "/student-login.html";
+      }
+    }
+
+    async function changePassword() {
+      const currentPassword = document.getElementById("currentPassword").value;
+      const newPassword = document.getElementById("newPassword").value;
+
+      if (!currentPassword || !newPassword) {
+        showToast("Both fields required", false);
+        return;
+      }
+
+      const res = await fetch("/api/student/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+
+      const data = await res.json();
+      showToast(data.message, data.success);
+
+      if (data.success) {
+        document.getElementById("currentPassword").value = "";
+        document.getElementById("newPassword").value = "";
       }
     }
 
