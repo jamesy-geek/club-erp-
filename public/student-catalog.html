@@ -31,53 +31,74 @@
 
     <div class="content">
       <h1>Component Catalog</h1>
-      <p style="color:#64748b; margin-top:-16px; margin-bottom:20px; font-size:14px;">Browse available components and submit requests</p>
+      <p style="color:#64748b; margin-top:-16px; margin-bottom:20px; font-size:14px;">Browse available components and submit your request</p>
 
-      <div class="card">
-        <input type="text" id="searchInput" placeholder="🔍 Search components..." onkeyup="filterCatalog()" style="margin-bottom:0;">
+      <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+        <input type="text" id="searchInput" placeholder="🔍 Search components..." onkeyup="filterCatalog()" style="margin-bottom:0; flex:1;">
+        <!-- Cart Toggle (Only for desktop) -->
+        <button id="cartToggleDesktop" onclick="toggleCartDrawer()" style="margin-left: 12px; display: none;">🛒 <span id="cartCountDesktop">0</span> Items</button>
       </div>
 
       <div id="catalogGrid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
       </div>
+
       <footer style="margin-top:60px; text-align:center; padding-bottom:20px; color:#94a3b8; font-size:11px;">
         Built by Jishnu Abbhay D
       </footer>
     </div>
   </div>
 
-
-  <!-- Request Modal -->
-  <div class="modal-overlay" id="requestModal">
-    <div class="modal-box">
-      <h2>📦 Request Component</h2>
-      <input type="hidden" id="reqComponentId">
-
-      <label>Component</label>
-      <input id="reqComponentName" readonly style="background:#f1f5f9; font-weight:600;">
-
-      <label>Available Stock</label>
-      <input id="reqAvailable" readonly style="background:#f1f5f9;">
-
-      <label>Quantity</label>
-      <input id="reqQuantity" type="number" min="1" placeholder="Enter quantity">
-
-      <label>Purpose / Note (optional)</label>
-      <textarea id="reqNote" rows="3" placeholder="e.g., For project, hackathon submission..." style="resize:vertical;"></textarea>
-
-      <div class="modal-actions">
-        <button class="btn-cancel" onclick="closeRequestModal()">Cancel</button>
-        <button onclick="submitRequest()" style="background: #1e293b;">Submit Request</button>
-      </div>
+  <!-- Cart Drawer -->
+  <div id="cartOverlay" class="modal-overlay" onclick="toggleCartDrawer()"></div>
+  <div id="cartDrawer" style="position:fixed; top:0; right:-400px; width:400px; max-width:100%; height:100%; background:var(--bg); border-left:1px solid var(--border); box-shadow:-5px 0 25px rgba(0,0,0,0.1); z-index:1100; transition:0.3s cubic-bezier(0.4, 0, 0.2, 1); display:flex; flex-direction:column;">
+    <div style="padding:20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+      <h2 style="margin:0;">🛒 Your Cart</h2>
+      <button onclick="toggleCartDrawer()" style="background:transparent; color:var(--text); font-size:24px; padding:0; height:auto; width:auto; border:none; box-shadow:none;">&times;</button>
     </div>
+    <div id="cartItemsList" style="flex:1; overflow-y:auto; padding:20px;">
+      <!-- JavaScript will populate this -->
+      <p style="color:#94a3b8; text-align:center; margin-top:40px;">Your cart is empty.</p>
+    </div>
+    <div style="padding:20px; border-top:1px solid var(--border); background:#f8fafc;">
+      <div class="dark:bg-#1e293b">
+        <label style="font-size:13px; font-weight:600; color:#64748b;">Purpose / Note (optional)</label>
+        <textarea id="cartPurposeNote" rows="2" placeholder="e.g., For project, hackathon..." style="resize:none; margin-top:5px; margin-bottom:15px;"></textarea>
+      </div>
+      <button id="submitBulkRequestBtn" onclick="submitCart()" style="width:100%; justify-content:center; background:#1e293b; padding:14px;" disabled>
+        Submit Request
+      </button>
+    </div>
+  </div>
+
+  <!-- Floating Cart FAB (For Mobile) -->
+  <div id="cartFAB" onclick="toggleCartDrawer()" style="position:fixed; bottom:30px; right:30px; width:64px; height:64px; border-radius:50%; background:#1e293b; color:white; display:flex; align-items:center; justify-content:center; box-shadow:0 8px 30px rgba(0,0,0,0.2); cursor:pointer; z-index:1000; transition:0.2s;">
+    <span style="font-size:24px;">🛒</span>
+    <span id="cartBadgeCount" style="position:absolute; top:-5px; right:-5px; background:#dc2626; color:white; font-size:11px; font-weight:bold; width:22px; height:22px; border-radius:50%; display:none; align-items:center; justify-content:center; border:2px solid white;">0</span>
   </div>
 
   <div id="toast"></div>
 
+  <script src="/club-branding.js"></script>
   <script>
     let allComponents = [];
+    let cart = []; // Array of { component_id, component_name, quantity, available_quantity }
 
     function toggleMenu() {
       document.getElementById("sidebar").classList.toggle("active");
+    }
+
+    function toggleCartDrawer() {
+      const drawer = document.getElementById("cartDrawer");
+      const overlay = document.getElementById("cartOverlay");
+      if (drawer.style.right === "0px") {
+        drawer.style.right = "-400px";
+        overlay.classList.remove("active");
+        document.body.style.overflow = "auto";
+      } else {
+        drawer.style.right = "0px";
+        overlay.classList.add("active");
+        document.body.style.overflow = "hidden";
+      }
     }
 
     function showToast(message, success = true) {
@@ -85,7 +106,7 @@
       toast.style.background = success ? "#16a34a" : "#dc2626";
       toast.innerText = message;
       toast.style.display = "block";
-      setTimeout(() => toast.style.display = "none", 2500);
+      setTimeout(() => toast.style.display = "none", 3000);
     }
 
     async function logout() {
@@ -118,71 +139,167 @@
       }
       grid.innerHTML = components.map(c => {
         const inStock = c.available_quantity > 0;
-        const stockColor = inStock ? '#16a34a' : '#94a3b8';
-        const stockLabel = inStock ? `${c.available_quantity} Available` : 'Out of Stock';
+        const cartItem = cart.find(item => item.component_id === c.id);
+        const inCart = !!cartItem;
+
         return `
-          <div class="card" style="display:flex; flex-direction:column; justify-content:space-between;">
+          <div class="card" style="display:flex; flex-direction:column; justify-content:space-between; border:${inCart ? '2px solid #2563eb' : 'none'}; box-shadow:${inCart ? '0 8px 30px rgba(37, 99, 235, 0.1)' : '0 2px 4px rgba(0,0,0,0.05)'};">
             <div>
               ${c.photo1 ? `<img src="${c.photo1}" style="width:100%; height:120px; object-fit:cover; border-radius:8px; margin-bottom:12px;">` : ''}
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                 <strong style="font-size:15px;">${c.name}</strong>
-                <span class="badge" style="background:${stockColor};color:#fff; font-size:11px;">${stockLabel}</span>
+                <span class="badge" style="background:${inStock ? '#16a34a' : '#94a3b8'}; color:#fff; font-size:11px;">
+                  ${inStock ? `${c.available_quantity} Avl` : 'Out of Stock'}
+                </span>
               </div>
               <p style="color:#64748b; font-size:13px; margin:0;">Total: ${c.total_quantity} | Available: ${c.available_quantity}</p>
             </div>
-            <button onclick="openRequestModal(${c.id}, '${c.name.replace(/'/g, "\\'")}', ${c.available_quantity})" style="margin-top:14px; background: ${inStock ? '#1e293b' : '#94a3b8'}; width:100%; justify-content:center;">
-              ${inStock ? '📨 Request' : '📨 Request (Out of Stock)'}
-            </button>
+            
+            ${!inStock ? `
+               <button disabled style="margin-top:14px; background: #94a3b8; width:100%; justify-content:center;">Out of Stock</button>
+            ` : (inCart ? `
+               <div style="display:flex; gap:8px; margin-top:14px;">
+                  <div style="display:flex; align-items:center; background:#f1f5f9; border-radius:8px; flex:1; justify-content:space-between; padding:0 10px;">
+                    <button onclick="updateCartQty(${c.id}, -1)" style="background:transparent; color:#1e293b; padding:8px 12px; height:auto; border:none; box-shadow:none;">-</button>
+                    <span style="font-weight:bold; font-size:14px;">${cartItem.quantity}</span>
+                    <button onclick="updateCartQty(${c.id}, 1)" style="background:transparent; color:#1e293b; padding:8px 12px; height:auto; border:none; box-shadow:none;">+</button>
+                  </div>
+                  <button onclick="removeFromCart(${c.id})" style="background:#ef4444; width:48px; min-width:unset; align-items:center; justify-content:center;">🗑️</button>
+               </div>
+            ` : `
+               <button onclick="addToCart(${c.id}, '${c.name.replace(/'/g, "\\'")}', ${c.available_quantity})" style="margin-top:14px; background: #1e293b; width:100%; justify-content:center;">
+                🛒 Add to Cart
+              </button>
+            `)}
           </div>
         `;
       }).join('');
     }
 
-    function openRequestModal(componentId, componentName, available) {
-      document.getElementById("reqComponentId").value = componentId;
-      document.getElementById("reqComponentName").value = componentName;
-      document.getElementById("reqAvailable").value = available + " units";
-      document.getElementById("reqQuantity").value = "";
-      document.getElementById("reqQuantity").max = available;
-      document.getElementById("reqNote").value = "";
-      document.getElementById("requestModal").classList.add("active");
+    // --- Cart Actions ---
+
+    function addToCart(component_id, component_name, available_quantity) {
+      cart.push({ component_id, component_name, quantity: 1, available_quantity });
+      updateUI();
+      renderCatalog(allComponents);
+      
+      // Pulse animation for the FAB
+      const fab = document.getElementById("cartFAB");
+      fab.style.transform = "scale(1.15)";
+      setTimeout(() => fab.style.transform = "scale(1)", 200);
     }
 
-    function closeRequestModal() {
-      document.getElementById("requestModal").classList.remove("active");
+    function removeFromCart(component_id) {
+      cart = cart.filter(item => item.component_id !== component_id);
+      updateUI();
+      renderCatalog(allComponents);
     }
 
-    document.getElementById("requestModal").addEventListener("click", function(e) {
-      if (e.target === this) closeRequestModal();
-    });
-
-    async function submitRequest() {
-      const component_id = parseInt(document.getElementById("reqComponentId").value);
-      const quantity = parseInt(document.getElementById("reqQuantity").value);
-      const purpose_note = document.getElementById("reqNote").value.trim();
-
-      if (!quantity || quantity < 1) {
-        showToast("Enter a valid quantity", false);
+    function updateCartQty(component_id, delta) {
+      const item = cart.find(i => i.component_id === component_id);
+      if (!item) return;
+      
+      const newQty = item.quantity + delta;
+      
+      // Check stock limit
+      if (newQty > item.available_quantity) {
+        showToast(`Only ${item.available_quantity} available in stock`, false);
+        return;
+      }
+      
+      // Check global borrow limit (we'll fetch this from settings in catalog load if we wanted, but let's assume 5 for now as a safeguard)
+      if (newQty > 5) {
+        showToast("Max limit is 5 per item", false);
         return;
       }
 
+      if (newQty <= 0) {
+        removeFromCart(component_id);
+      } else {
+        item.quantity = newQty;
+        updateUI();
+        renderCatalog(allComponents);
+      }
+    }
+
+    function updateUI() {
+      // 1. Update Badge
+      const badge = document.getElementById("cartBadgeCount");
+      const desktopCount = document.getElementById("cartCountDesktop");
+      const totalItems = cart.length;
+
+      if (totalItems > 0) {
+        badge.innerText = totalItems;
+        badge.style.display = "flex";
+        desktopCount.innerText = totalItems;
+        document.getElementById("cartToggleDesktop").style.display = "flex";
+        document.getElementById("submitBulkRequestBtn").disabled = false;
+      } else {
+        badge.style.display = "none";
+        document.getElementById("cartToggleDesktop").style.display = "none";
+        document.getElementById("submitBulkRequestBtn").disabled = true;
+      }
+
+      // 2. Update Drawer List
+      const list = document.getElementById("cartItemsList");
+      if (cart.length === 0) {
+        list.innerHTML = '<p style="color:#94a3b8; text-align:center; margin-top:40px;">Your cart is empty.</p>';
+        return;
+      }
+
+      list.innerHTML = cart.map(item => `
+        <div style="background:#fff; border-radius:12px; padding:15px; margin-bottom:12px; box-shadow:0 2px 8px rgba(0,0,0,0.04); border:1px solid #f1f5f9;">
+          <div style="display:flex; justify-content:space-between; align-items:start;">
+            <div>
+              <strong style="display:block; font-size:15px;">${item.component_name}</strong>
+              <span style="color:#64748b; font-size:12px;">Stock: ${item.available_quantity} available</span>
+            </div>
+            <button onclick="removeFromCart(${item.component_id})" style="background:transparent; color:#64748b; font-size:14px; padding:0; height:auto; width:auto; border:none; box-shadow:none;">&times;</button>
+          </div>
+          <div style="display:flex; align-items:center; margin-top:12px; gap:15px;">
+            <div style="display:flex; align-items:center; background:#f8fafc; border-radius:8px; width:100px; justify-content:space-between; padding:4px 8px;">
+               <button onclick="updateCartQty(${item.component_id}, -1)" style="background:transparent; color:#1e293b; padding:4px 8px; font-weight:bold; height:auto; border:none; box-shadow:none;">-</button>
+               <span style="font-weight:bold; font-size:14px;">${item.quantity}</span>
+               <button onclick="updateCartQty(${item.component_id}, 1)" style="background:transparent; color:#1e293b; padding:4px 8px; font-weight:bold; height:auto; border:none; box-shadow:none;">+</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function submitCart() {
+      if (cart.length === 0) return;
+      
+      const purpose_note = document.getElementById("cartPurposeNote").value.trim();
+      const items = cart.map(i => ({ component_id: i.component_id, quantity: i.quantity }));
+      
+      document.getElementById("submitBulkRequestBtn").innerText = "⏳ Processing...";
+      document.getElementById("submitBulkRequestBtn").disabled = true;
+
       try {
-        const res = await fetch("/api/student/request", {
+        const res = await fetch("/api/student/request-bulk", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ component_id, quantity, purpose_note })
+          body: JSON.stringify({ items, purpose_note })
         });
         const data = await res.json();
 
         if (data.success) {
-          showToast("Request submitted! ✅");
-          closeRequestModal();
-          loadCatalog();
+          showToast(data.message);
+          cart = [];
+          document.getElementById("cartPurposeNote").value = "";
+          updateUI();
+          renderCatalog(allComponents);
+          toggleCartDrawer();
         } else {
           showToast(data.message, false);
+          document.getElementById("submitBulkRequestBtn").innerText = "Submit Request";
+          document.getElementById("submitBulkRequestBtn").disabled = false;
         }
       } catch (err) {
         showToast("Error submitting request", false);
+        document.getElementById("submitBulkRequestBtn").innerText = "Submit Request";
+        document.getElementById("submitBulkRequestBtn").disabled = false;
       }
     }
 
@@ -192,3 +309,4 @@
 <script src="/dark-mode.js"></script>
 </body>
 </html>
+

@@ -5,6 +5,7 @@
   <title>Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script>if (localStorage.getItem("darkMode") == "true") document.documentElement.className = "dark"</script>
+  <script src="/club-branding.js"></script>
 </head>
 
 <body>
@@ -78,16 +79,6 @@
               return;
             }
             const data = await res.json();
-
-            // Update Dynamic Branding
-            if (data.club_name) {
-              document.getElementById("clubNameHeader").innerText = data.club_name;
-              document.querySelector(".sidebar h2").innerHTML = `<img src="/ennovate-logo.png" alt=""> ${data.club_name}`;
-              document.title = `${data.club_name} — Dashboard`;
-            }
-            if (data.club_tagline) {
-              document.getElementById("clubTagline").innerText = data.club_tagline;
-            }
 
             const summaryDiv = document.getElementById("summary");
             if (!summaryDiv) return;

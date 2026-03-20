@@ -1437,6 +1437,52 @@ app.post("/api/student/request", requireStudent, async (req, res) => {
   }
 });
 
+// Submit bulk component requests (Cart System)
+app.post("/api/student/request-bulk", requireStudent, async (req, res) => {
+  const { items, purpose_note } = req.body;
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return res.json({ success: false, message: "Invalid request: No items provided" });
+  }
+
+  try {
+    const settings = await getSettings();
+    const maxQty = parseInt(settings.max_borrow_quantity || '5');
+    const allowOutOfStock = settings.allow_out_of_stock_requests === 'true';
+
+    // 1. Validation loop
+    for (const item of items) {
+      const { component_id, quantity } = item;
+      if (!component_id || !quantity || quantity < 1) {
+        return res.json({ success: false, message: "Invalid item data in cart" });
+      }
+
+      if (quantity > maxQty) {
+        return res.json({ success: false, message: `Request exceeds limit for an item. Max allowed is ${maxQty} per item.` });
+      }
+
+      const comp = await db.execute({ sql: "SELECT * FROM components WHERE id = ?", args: [component_id] });
+      if (comp.rows.length === 0) return res.json({ success: false, message: "One of the items was not found" });
+
+      if (!allowOutOfStock && comp.rows[0].available_quantity < quantity) {
+        return res.json({ success: false, message: `Insufficient stock for "${comp.rows[0].name}". Only ${comp.rows[0].available_quantity} available.` });
+      }
+    }
+
+    // 2. Insertion loop
+    for (const item of items) {
+      await db.execute({
+        sql: `INSERT INTO component_requests (student_id, component_id, quantity, purpose_note, status) VALUES (?, ?, ?, ?, 'PENDING')`,
+        args: [req.session.student_id, item.component_id, item.quantity, purpose_note || null]
+      });
+    }
+
+    res.json({ success: true, message: "All requests submitted successfully! ✅" });
+  } catch (err) {
+    console.error("Bulk request submit error:", err);
+    res.json({ success: false, message: "Error submitting requests" });
+  }
+});
+
 // Get own requests
 app.get("/api/student/requests", requireStudent, async (req, res) => {
   try {

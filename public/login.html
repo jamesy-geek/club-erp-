@@ -5,7 +5,8 @@
   <title>Admin Login</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="/style.css">
-<script>if(localStorage.getItem("darkMode")=="true")document.documentElement.className="dark"</script>
+  <script>if (localStorage.getItem("darkMode") == "true") document.documentElement.className = "dark"</script>
+  <script src="/club-branding.js"></script>
 </head>
 
 <body>
@@ -16,20 +17,7 @@
       <img src="/ennovate-logo.png" alt=".ennovate" style="width: 140px; margin-bottom: 8px; opacity: 0.85;">
       <p id="clubTagline" style="color: #64748b; font-size: 12px; margin-bottom: 24px; letter-spacing: 0.5px;">Club ERP Management System</p>
 
-      <script>
-        (async () => {
-          try {
-            const res = await fetch("/api/public/settings");
-            const data = await res.json();
-            if (data.club_name) {
-              document.title = `${data.club_name} — Admin Login`;
-            }
-            if (data.club_tagline) {
-              document.getElementById("clubTagline").innerText = data.club_tagline;
-            }
-          } catch (e) {}
-        })();
-      </script>
+
 
       <div class="card" style="width:320px; text-align: left;">
         <h2 style="text-align: center; margin-bottom: 16px;">Admin Login</h2>
