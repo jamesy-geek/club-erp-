@@ -1,14 +1,14 @@
 # CERP — Club Equipment Resource Portal
-## Product Requirements Document — Version 1.2 (Final Built)
-### Student Request Portal, Admin Workflow, & Advanced Maintenance
+## Product Requirements Document — Version 1.3 (Current Production Build)
+### Student Request Portal (with Cart), Admin Workflow, & Advanced Maintenance
 
 | Field | Value |
 |---|---|
 | Product | CERP — Club Ennovate ERP System |
 | Feature | Student Request Portal & Advanced Admin Tools |
-| Version | 1.2 |
+| Version | **1.3** (`v1.3-detailed-login` — see `GET /version`) |
 | Status | **COMPLETED & BUILT** |
-| Author | Jishnu Abhay D (Enhanced by Antigravity) |
+| Author | Jishnu Abbhay D (Enhanced by Antigravity) |
 | Organization | Club Ennovate |
 | Date | March 2026 |
 
@@ -16,18 +16,25 @@
 
 ## 1. Executive Summary
 
-CERP has been transformed from a manual inventory tool into a full-scale **Student Request Portal**. Students now have self-service access to browse, request, and track equipment. Admins have gained powerful automation tools for bulk student management, automated backups, and data cleanup.
+CERP has been transformed from a manual inventory tool into a full-scale **Student Request Portal**. Students now have self-service access to browse, request (including a **multi-item cart**), and track equipment. Admins have gained powerful automation tools for bulk student management, automated backups, and data cleanup.
 
 The entire system has been redesigned with a **premium dark slate aesthetic** (Zero Purple policy) and high-performance backend supporting both local testing and Turso cloud deployment.
+
+**Release identifier:** The running app reports version **`v1.3-detailed-login`** (student login is **email + password**; sessions are stored in Turso).
 
 ---
 
 ## 2. Updated Feature Specification (Completed)
 
 ### 2.1 UI/UX Enhancements
-- **Dark Mode**: Comprehensive dark theme toggle (🌙/☀️) on all 17 pages. Preferences persist via `localStorage`.
+- **Dark Mode**: Comprehensive dark theme toggle (🌙/☀️) across admin and student pages. Preferences persist via `localStorage`.
 - **Slate Branding**: Unified "No Purple" design system. All indigo/purple accents replaced with high-contrast Dark Slate (`#0f172a`, `#1e293b`).
-- **Sidebar Consistency**: Synchronized 8-item navigation across all admin pages for muscle-memory efficiency.
+- **Sidebar Consistency**: Synchronized navigation across admin pages for muscle-memory efficiency.
+
+### 2.1a Student Request Cart (Catalog)
+- **Shopping-style cart** on **Component Catalog** (`/student-catalog`): add multiple components with quantities, optional shared purpose note, then **Submit Request** in one action.
+- **Desktop**: cart header button with item count; **mobile**: floating cart FAB with badge.
+- **Backend**: `POST /api/student/request-bulk` validates stock and max-quantity settings per line item, then creates one `component_requests` row per item (same optional note on each). Single-item flow remains available via `POST /api/student/request` if needed.
 
 ### 2.2 Student Management (Bulk & Maintenance)
 - **Bulk Student Import**: Admin can upload `.xlsx` files to enroll entire batches.
@@ -55,7 +62,9 @@ The entire system has been redesigned with a **premium dark slate aesthetic** (Z
 **Table: `backups` (New)**
 - `id`, `name`, `data` (Full JSON snapshot), `created_at`.
 
-### 3.2 Advanced Admin Routing
+### 3.2 Advanced Admin & Student API Routing
+- `GET /version`: Returns the current build string (e.g. `v1.3-detailed-login`).
+- **Student requests**: `POST /api/student/request` (single item); `POST /api/student/request-bulk` (cart / multiple items).
 - `GET /api/admin/student-import-template`: Downloads a formatted Excel template for admins.
 - `POST /api/admin/bulk-import-students`: High-speed Excel processing with smart column matching.
 - `POST /api/admin/cleanup-graduated`: Transaction-safe deletion of cleared students.
@@ -66,11 +75,11 @@ The entire system has been redesigned with a **premium dark slate aesthetic** (Z
 ## 4. User Flows (Built)
 
 ### 4.1 Student Workflow
-1. **Login**: Authenticate via USN/Email.
+1. **Login**: Authenticate with **email + password** (`/student-login.html`).
 2. **Dashboard**: View active borrows, request status, and dark-mode toggle.
-3. **Catalog**: Browse available stock with real-time "In Stock" indicators.
-4. **Request**: Submit request with quantity and purpose note.
-5. **Confirm**: Receive approval email → Collect item → Click "Confirm Receipt" link.
+3. **Catalog**: Browse available stock with real-time "In Stock" indicators; **add items to cart** (drawer + FAB), set optional purpose note, **submit** to create pending requests for all cart lines.
+4. **My Requests**: Track, edit, or withdraw pending requests as applicable.
+5. **Confirm**: After admin approval, collect item and use **Confirm Receipt** (token link) when applicable.
 
 ### 4.2 Admin Management Workflow
 1. **Import**: Batch-add 500+ students via Excel.
@@ -84,16 +93,17 @@ The entire system has been redesigned with a **premium dark slate aesthetic** (Z
 
 | Feature | Built? | Description |
 |---|:---:|---|
-| **Student Portal** | ✅ | Full self-service login and requests |
-| **Dark Mode** | ✅ | Persistent toggle on every page |
+| **Student Portal** | ✅ | Email/password login; self-service dashboard, catalog, requests, profile |
+| **Request Cart** | ✅ | Multi-item cart on catalog; bulk submit via `request-bulk` API |
+| **Dark Mode** | ✅ | Persistent toggle on student and admin pages |
 | **Zero Purple UI** | ✅ | Brand-consistent dark slate theme |
-| **Consistent Sidebar** | ✅ | Identical nav order on 17+ pages |
+| **Consistent Sidebar** | ✅ | Predictable nav across admin and student areas |
 | **Excel Student Import** | ✅ | Smart mapping for bulk enrollment |
 | **Auto-Backup in DB** | ✅ | 6hr interval snapshots for server portability |
 | **Graduated Cleanup** | ✅ | Smart deletion with "unreturned item" safety lock |
-| **Turso Integration** | ✅ | Production-ready cloud DB support |
-| **Email Workflow** | ✅ | SMTP integration for request confirmations |
+| **Turso Integration** | ✅ | Production-ready cloud DB + session store |
+| **Build Version** | ✅ | `GET /version` → `v1.3-detailed-login` |
 
 ---
 
-*CERP — Club Ennovate | Final Production Version 1.2 | March 2026*
+*CERP — Club Ennovate | Production Version 1.3 (`v1.3-detailed-login`) | March 2026*
