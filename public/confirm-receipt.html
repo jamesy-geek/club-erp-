@@ -1,64 +1,65 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="utf-8">
   <title>Confirm Receipt — CERP</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="/style.css">
-  <script>if (localStorage.getItem("darkMode") == "true") document.documentElement.className = "dark"</script>
-  <script src="/club-branding.js"></script>
+  <link rel="stylesheet" href="/student-style.css">
 </head>
-<body>
+<body class="student-portal">
 
-  <div class="layout" style="justify-content:center;align-items:center; min-height:100vh;">
-    <div style="text-align:center; max-width:440px; padding:20px;">
-      <img src="/ennovate-logo.png" alt=".ennovate" style="width:120px; margin-bottom:12px; opacity:0.85;">
+  <div class="sp-confirm-page">
+    <div style="text-align:center;">
+      <img src="/ennovate-logo.png" alt="Ennovate" width="48" height="48" style="filter:invert(1); margin-bottom:20px;">
 
-      <div class="card" id="resultCard" style="text-align:center;">
+      <div class="sp-confirm-card" id="resultCard">
         <div id="loadingState">
-          <div style="font-size:40px; margin-bottom:12px;">⏳</div>
-          <h2 style="color:#334155;">Confirming Receipt...</h2>
-          <p style="color:#64748b; font-size:14px;">Please wait while we process your confirmation.</p>
+          <p class="sp-confirm-msg" style="letter-spacing:4px;">···</p>
+          <h2>CONFIRMING</h2>
+          <p class="sp-confirm-msg">// Please wait while we process your confirmation.</p>
         </div>
 
         <div id="successState" style="display:none;">
-          <div style="font-size:48px; margin-bottom:12px;">✅</div>
-          <h2 style="color:#16a34a;">Receipt Confirmed!</h2>
-          <p style="color:#64748b; font-size:14px;">Thank you for confirming. Your transaction record has been updated.</p>
+          <svg class="sp-check-svg" width="64" height="64" viewBox="0 0 64 64" style="margin:0 auto 12px; display:block;">
+            <path d="M16 34 L28 46 L48 22" />
+          </svg>
+          <h2>CONFIRMED</h2>
+          <p class="sp-confirm-msg">// Thank you. Your transaction record has been updated.</p>
         </div>
 
         <div id="alreadyState" style="display:none;">
-          <div style="font-size:48px; margin-bottom:12px;">ℹ️</div>
-          <h2 style="color:#2563eb;">Already Confirmed</h2>
-          <p style="color:#64748b; font-size:14px;">This receipt has already been confirmed. No further action is needed.</p>
+          <h2>ALREADY CONFIRMED</h2>
+          <p class="sp-confirm-msg">// No further action is needed.</p>
         </div>
 
         <div id="errorState" style="display:none;">
-          <div style="font-size:48px; margin-bottom:12px;">❌</div>
-          <h2 style="color:#dc2626;">Confirmation Failed</h2>
-          <p id="errorMessage" style="color:#64748b; font-size:14px;"></p>
+          <h2>ERROR</h2>
+          <p class="sp-confirm-msg" id="errorMessage"></p>
         </div>
       </div>
 
-      <p style="color:#94a3b8; font-size:11px; margin-top:16px;" class="dynamic-club-name">CERP — Club Ennovate Resource Portal</p>
+      <p class="sp-sub" style="margin-top:20px;">CERP — Club Ennovate Resource Portal</p>
     </div>
   </div>
 
+  <script src="/grain.js"></script>
+  <script src="/identity-strip.js"></script>
+  <script src="/student-cursor.js"></script>
+  <script src="/magnetic-buttons.js"></script>
+  <script src="/club-branding.js"></script>
+  <script src="/dark-mode.js"></script>
   <script>
     async function confirmReceipt() {
       const params = new URLSearchParams(window.location.search);
       const token = params.get("token");
-
       if (!token) {
         showError("No confirmation token found in the URL.");
         return;
       }
-
       try {
-        const res = await fetch(`/api/confirm-receipt?token=${encodeURIComponent(token)}`);
+        const res = await fetch("/api/confirm-receipt?token=" + encodeURIComponent(token));
         const data = await res.json();
-
         document.getElementById("loadingState").style.display = "none";
-
         if (data.success && data.already_confirmed) {
           document.getElementById("alreadyState").style.display = "block";
         } else if (data.success) {
@@ -70,16 +71,12 @@
         showError("Connection error. Please try again later.");
       }
     }
-
     function showError(message) {
       document.getElementById("loadingState").style.display = "none";
-      document.getElementById("errorMessage").textContent = message;
+      document.getElementById("errorMessage").textContent = "// " + message;
       document.getElementById("errorState").style.display = "block";
     }
-
     window.onload = confirmReceipt;
   </script>
-
-<script src="/dark-mode.js"></script>
 </body>
 </html>

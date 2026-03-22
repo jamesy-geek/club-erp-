@@ -10,7 +10,6 @@
 <body>
   <p>Loading...</p>
   <script>
-    // Check if user is authenticated, redirect accordingly
     fetch('/dashboard-summary', { credentials: 'same-origin' })
       .then(res => {
         if (res.ok) {

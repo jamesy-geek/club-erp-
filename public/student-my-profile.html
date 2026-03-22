@@ -1,136 +1,293 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="utf-8">
   <title>My Profile — CERP</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="/style.css">
-<script>if(localStorage.getItem("darkMode")=="true")document.documentElement.className="dark"</script>
-  <script src="/club-branding.js"></script>
+  <link rel="stylesheet" href="/student-style.css">
 </head>
-<body>
+<body class="student-portal">
 
-  <div class="menu-toggle" onclick="toggleMenu()">☰ Menu</div>
+  <div class="sp-topbar">
+    <button type="button" onclick="document.getElementById('sidebar').classList.toggle('is-open')">[ ≡ ]</button>
+    <span>MENU</span>
+  </div>
 
-  <div class="layout">
-
-    <div class="sidebar student-sidebar" id="sidebar">
-      <h2><img src="/ennovate-logo.png" alt=""> CERP</h2>
-      <a href="/student-dashboard">Dashboard</a>
-      <a href="/student-catalog">Catalog</a>
-      <a href="/student-requests-page">My Requests</a>
-      <a href="/student-my-profile" class="active">My Profile</a>
-      <hr>
-      <a href="#" onclick="logout()">Logout</a>
-      <div class="sidebar-footer">
+  <div class="sp-layout">
+    <aside class="sp-sidebar" id="sidebar">
+      <div class="sp-sidebar__head">
         <img src="/ennovate-logo.png" alt="">
-        <span>Student Portal</span>
-        <span style="display:block; margin-top:8px; opacity:0.8; font-size:9px;">Built by Jishnu Abbhay D</span>
+        <span>CERP</span>
       </div>
-    </div>
+      <nav class="sp-nav">
+        <a href="/student-dashboard">Dashboard</a>
+        <a href="/student-catalog">Catalog</a>
+        <a href="/student-requests-page">My Requests</a>
+        <a href="/student-my-profile" class="is-active">My Profile</a>
+        <a href="#" onclick="logout(); return false;">Logout</a>
+      </nav>
+      <div class="sp-sidebar__foot">
+        <img src="/ennovate-logo.png" alt="">
+        Student Portal<br>
+        Built by Jishnu Abbhay D
+      </div>
+    </aside>
 
-    <div class="content">
-      <h1>My Profile</h1>
-      <p style="color:#64748b; margin-top:-16px; margin-bottom:20px; font-size:15px;">Your account details</p>
+    <main class="sp-main">
+      <h1 class="sp-title">MY PROFILE</h1>
+      <p class="sp-sub">// Your account details</p>
 
-      <div class="card" style="border-left: 4px solid #1e293b;">
-        <div id="profileDetails" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:20px;">
-          <p style="color:#94a3b8; font-size:13px;">Loading...</p>
+      <div style="display:flex; flex-wrap:wrap; gap:32px; align-items:flex-start;">
+        <div>
+          <div class="sp-avatar-wrap">
+            <div class="sp-avatar-ring"></div>
+            <div class="sp-avatar-ring"></div>
+            <div class="sp-avatar-ring"></div>
+            <div class="sp-avatar" id="avatarInitials">—</div>
+            <div class="sp-online-dot"></div>
+          </div>
+        </div>
+        <div style="flex:1; min-width:240px;">
+          <div id="nameBlock" style="font-family:'Bebas Neue',sans-serif; font-size:42px; letter-spacing:2px; line-height:1;">—</div>
+          <div id="tagPills" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;"></div>
         </div>
       </div>
 
-      <!-- NEW: CHANGE PASSWORD -->
-      <div class="card" style="max-width:400px; margin-top:30px; border-left: 4px solid #ef4444;">
-        <h3>🔒 Change Password</h3>
-        <p style="color:#64748b; font-size:13px; margin-bottom:15px;">Secure your account with a new password.</p>
-        
-        <label>Current Password</label>
-        <input type="password" id="currentPassword" placeholder="Enter current password">
-        
-        <label style="margin-top:10px;">New Password</label>
-        <input type="password" id="newPassword" placeholder="Enter new password">
-        
-        <button style="margin-top:15px; background:#ef4444;" onclick="changePassword()">Update Password</button>
+      <div class="sp-stat-grid" id="statGrid">
+        <div class="sp-stat-cell"><div class="sp-stat-num" data-target="0" id="s0">0</div><div class="sp-stat-label">Total Borrowed</div></div>
+        <div class="sp-stat-cell"><div class="sp-stat-num" data-target="0" id="s1">0</div><div class="sp-stat-label">Returned</div></div>
+        <div class="sp-stat-cell"><div class="sp-stat-num" data-target="0" id="s2">0</div><div class="sp-stat-label">Active Holds</div></div>
+        <div class="sp-stat-cell"><div class="sp-stat-num" data-target="0" id="s3">0</div><div class="sp-stat-label">Requests Made</div></div>
       </div>
 
-      <footer style="margin-top:60px; text-align:center; padding-bottom:20px; color:#94a3b8; font-size:11px;">
-        Built by Jishnu Abbhay D
-      </footer>
-    </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-bottom:28px;" id="fieldGrid"></div>
+
+      <div class="sp-card" style="margin-bottom:24px;">
+        <h2 style="font-family:'Bebas Neue',sans-serif; font-size:22px; margin:0 0 12px;">Active Holds</h2>
+        <div id="holdsPanel"><p class="sp-sub">// none</p></div>
+      </div>
+
+      <div class="sp-card" style="margin-bottom:24px;">
+        <p class="sp-sub" style="margin:0 0 12px;" id="idPatternLabel">// Identity Pattern</p>
+        <div class="sp-id-pattern" id="idPattern"></div>
+      </div>
+
+      <div class="sp-card" style="margin-bottom:24px;">
+        <h2 style="font-family:'Bebas Neue',sans-serif; font-size:22px; margin:0 0 8px;">Activity</h2>
+        <p class="sp-sub">// Requests by month (last 8)</p>
+        <div class="sp-chart" id="actChart"></div>
+      </div>
+
+      <div class="sp-card" style="border-left:2px solid rgba(248,113,113,0.32); max-width:440px;">
+        <h2 style="font-family:'Bebas Neue',sans-serif; font-size:22px; margin:0 0 12px;">Password</h2>
+        <label class="sp-label" for="currentPassword">Current</label>
+        <input id="currentPassword" type="password" autocomplete="current-password">
+        <label class="sp-label" for="newPassword" style="margin-top:12px;">New</label>
+        <input id="newPassword" type="password" autocomplete="new-password">
+        <button type="button" class="sp-btn sp-btn--danger sp-interactive" style="margin-top:16px;" onclick="changePassword()">[ Update Password ]</button>
+      </div>
+    </main>
   </div>
 
-  <div id="toast"></div>
+  <div id="toast" class="sp-toast" role="status"></div>
 
+  <script src="/grain.js"></script>
+  <script src="/identity-strip.js"></script>
+  <script src="/student-cursor.js"></script>
+  <script src="/magnetic-buttons.js"></script>
+  <script src="/club-branding.js"></script>
+  <script src="/dark-mode.js"></script>
   <script>
-    function toggleMenu() {
-      document.getElementById("sidebar").classList.toggle("active");
-    }
-
     function showToast(message, success = true) {
-      const toast = document.getElementById("toast");
-      toast.style.background = success ? "#16a34a" : "#dc2626";
-      toast.innerText = message;
-      toast.style.display = "block";
-      setTimeout(() => toast.style.display = "none", 2500);
+      const t = document.getElementById("toast");
+      t.textContent = message;
+      t.className = "sp-toast is-visible " + (success ? "sp-toast--ok" : "sp-toast--err");
+      setTimeout(() => t.classList.remove("is-visible"), 2500);
     }
-
     async function logout() {
       await fetch("/student-logout", { method: "POST" });
       window.location.href = "/student-login.html";
     }
-
+    function initials(name) {
+      if (!name) return "?";
+      const p = name.trim().split(/\s+/);
+      return ((p[0][0]||"")+(p[1]?p[1][0]:"")).toUpperCase().slice(0,2);
+    }
+    function seedFromUSN(usn) {
+      return (usn || "").split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+    }
+    function renderPattern(usn) {
+      const seed = seedFromUSN(usn);
+      const el = document.getElementById("idPattern");
+      el.innerHTML = "";
+      for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+          const mc = Math.min(c, 7 - c);
+          const idx = r * 8 + mc;
+          const on = Math.sin(seed + idx) > 0;
+          const cell = document.createElement("div");
+          cell.className = "sp-id-cell" + (on ? " on" : "");
+          el.appendChild(cell);
+        }
+      }
+    }
+    function countUp(el, target, delay) {
+      const t = Math.floor(Number(target) || 0);
+      const steps = 40;
+      let cur = 0;
+      const inc = Math.max(1, Math.ceil(t / steps));
+      function tick() {
+        cur = Math.min(cur + inc, t);
+        el.textContent = cur;
+        if (cur < t) setTimeout(tick, 24);
+        else el.textContent = t;
+      }
+      setTimeout(tick, delay);
+    }
     async function loadProfile() {
+      let student;
       try {
         const res = await fetch("/student-session", { credentials: "same-origin" });
         if (res.status === 401) { window.location.href = "/student-login.html"; return; }
-        const student = await res.json();
-
-        const fields = [
-          { label: "Full Name", value: student.student_name, icon: "👤" },
-          { label: "USN", value: (student.usn || '').toUpperCase(), icon: "🎓" },
-          { label: "Email", value: student.email || "N/A", icon: "📧" },
-          { label: "Phone", value: student.phone || "N/A", icon: "📞" },
-          { label: "Semester", value: student.semester || "N/A", icon: "📅" },
-          { label: "Department", value: student.department || "N/A", icon: "🏛️" }
-        ];
-
-        document.getElementById("profileDetails").innerHTML = fields.map(f => `
-          <div style="background:#f8fafc; padding:16px; border-radius:10px;">
-            <div style="font-size:11px; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">${f.icon} ${f.label}</div>
-            <div style="font-size:16px; font-weight:600; color:#1e293b;">${f.value}</div>
-          </div>
-        `).join('');
+        student = await res.json();
       } catch (e) {
         window.location.href = "/student-login.html";
+        return;
       }
-    }
+      const usn = (student.usn || "").toUpperCase();
+      document.getElementById("avatarInitials").textContent = initials(student.student_name);
+      document.getElementById("nameBlock").textContent = (student.student_name || "").toUpperCase();
+      document.getElementById("tagPills").innerHTML = [
+        usn, student.department || "—", student.semester || "—", "Club"
+      ].map(t => `<span style="font-family:'JetBrains Mono',monospace; font-size:7px; letter-spacing:2px; padding:4px 10px; border:1px solid var(--border); color:var(--dim);">${escapeHtml(t)}</span>`).join("");
 
+      document.getElementById("idPatternLabel").textContent = "// Identity Pattern · " + usn;
+      renderPattern(usn);
+
+      const fg = document.getElementById("fieldGrid");
+      const fields = [
+        { k: "// Full Name", v: student.student_name, usn: false, copy: false },
+        { k: "// USN", v: usn, usn: true, copy: true, id: "f-usn" },
+        { k: "// Email", v: student.email || "—", usn: false, copy: !!student.email, id: "f-em" },
+        { k: "// Phone", v: student.phone || "—", usn: false, copy: false },
+        { k: "// Semester", v: student.semester || "—", usn: false, copy: false },
+        { k: "// Department", v: student.department || "—", usn: false, copy: false }
+      ];
+      fg.innerHTML = fields.map(f => {
+        const copy = f.copy && f.id;
+        return `
+        <div class="sp-field-tile${copy ? " is-copy" : ""}"${copy ? ` id="tile-${f.id}" onclick="copyField('${f.id}')"` : ""}>
+          ${copy ? '<span class="sp-copy-hint">[ copy ]</span>' : ""}
+          <div class="sp-sub" style="margin:0;">${f.k}</div>
+          <div style="font-family:${f.usn ? "'Bebas Neue',sans-serif" : "Barlow,sans-serif"}; font-weight:600; font-size:${f.usn ? "22px" : "14px"}; letter-spacing:${f.usn ? "2px" : "0"}; margin-top:6px;" id="${f.id || ""}">${escapeHtml(String(f.v))}</div>
+        </div>`;
+      }).join("");
+
+      let summary;
+      try {
+        const res = await fetch("/api/student/profile-summary", { credentials: "same-origin" });
+        if (!res.ok) throw new Error();
+        summary = await res.json();
+      } catch (e) {
+        summary = { stats: { totalBorrowed: 0, totalReturned: 0, activeHolds: 0, requestsMade: 0 }, activeHoldRows: [], monthlyRequests: [] };
+      }
+      const st = summary.stats;
+      [st.totalBorrowed, st.totalReturned, st.activeHolds, st.requestsMade].forEach((v, i) => {
+        countUp(document.getElementById("s" + i), v, i * 120);
+      });
+
+      const hp = document.getElementById("holdsPanel");
+      if (!summary.activeHoldRows || summary.activeHoldRows.length === 0) {
+        hp.innerHTML = '<p class="sp-sub">// none</p>';
+      } else {
+        setTimeout(() => {
+          hp.innerHTML = summary.activeHoldRows.map(row => {
+            const total = Math.max(1, row.component_total || 1);
+            const pct = Math.min(100, (row.held / total) * 100);
+            return `
+              <div class="sp-hold-row" style="margin-bottom:16px;">
+                <div style="display:flex; justify-content:space-between; font-family:Barlow,sans-serif; font-size:13px; font-weight:600;">
+                  <span>${escapeHtml(row.component_name)}</span>
+                  <span style="font-family:'Bebas Neue',sans-serif; font-size:22px;">${row.held}</span>
+                </div>
+                <div class="sp-hold-bar" style="width:0%;" data-w="${pct}"></div>
+                <div style="font-family:'JetBrains Mono',monospace; font-size:8px; color:var(--dim); margin-top:4px;">// ${row.held} of ${total} held</div>
+              </div>`;
+          }).join("");
+          hp.querySelectorAll(".sp-hold-bar").forEach(bar => {
+            const w = bar.getAttribute("data-w");
+            setTimeout(() => { bar.style.width = w + "%"; }, 400);
+          });
+        }, 50);
+      }
+
+      const months = [];
+      const now = new Date();
+      for (let i = 7; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        months.push({ key: d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"), label: (d.getMonth() + 1) + "/" + String(d.getFullYear()).slice(2) });
+      }
+      const map = {};
+      (summary.monthlyRequests || []).forEach(m => { map[m.ym] = m.cnt; });
+      const maxC = Math.max(1, ...months.map(m => map[m.key] || 0));
+      const chart = document.getElementById("actChart");
+      chart.innerHTML = months.map((m, i) => {
+        const c = map[m.key] || 0;
+        const h = (c / maxC) * 100;
+        const isCur = m.key === (now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0"));
+        return `<div style="flex:1; display:flex; flex-direction:column; justify-content:flex-end; align-items:stretch; height:120px;">
+          <div class="sp-chart-bar ${isCur ? "is-current" : ""}" style="height:${h}%;" title="${c} request(s)"></div>
+          <span style="font-family:'JetBrains Mono',monospace; font-size:7px; color:var(--dim); text-align:center; margin-top:8px;">${m.label}</span>
+        </div>`;
+      }).join("");
+      setTimeout(() => {
+        chart.querySelectorAll(".sp-chart-bar").forEach((bar, i) => {
+          const h = bar.style.height;
+          bar.style.height = "0%";
+          setTimeout(() => { bar.style.height = h; }, i * 80);
+        });
+      }, 30);
+
+      window.initStudentMagnetic();
+    }
+    function escapeHtml(s) {
+      const d = document.createElement("div");
+      d.textContent = s;
+      return d.innerHTML;
+    }
+    function copyField(id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      navigator.clipboard.writeText(el.textContent.trim()).then(() => {
+        showToast("Copied");
+        const tile = document.getElementById("tile-" + id);
+        if (tile) {
+          tile.style.borderColor = "rgba(74,222,128,0.4)";
+          setTimeout(() => { tile.style.borderColor = ""; }, 1800);
+        }
+      });
+    }
     async function changePassword() {
       const currentPassword = document.getElementById("currentPassword").value;
       const newPassword = document.getElementById("newPassword").value;
-
       if (!currentPassword || !newPassword) {
         showToast("Both fields required", false);
         return;
       }
-
       const res = await fetch("/api/student/change-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({ currentPassword, newPassword })
       });
-
       const data = await res.json();
       showToast(data.message, data.success);
-
       if (data.success) {
         document.getElementById("currentPassword").value = "";
         document.getElementById("newPassword").value = "";
       }
     }
-
     window.onload = loadProfile;
   </script>
-
-<script src="/dark-mode.js"></script>
 </body>
 </html>

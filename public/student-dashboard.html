@@ -1,182 +1,161 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="utf-8">
   <title>Student Dashboard — CERP</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="/style.css">
-<script>if(localStorage.getItem("darkMode")=="true")document.documentElement.className="dark"</script>
-  <script src="/club-branding.js"></script>
+  <link rel="stylesheet" href="/student-style.css">
 </head>
-<body>
+<body class="student-portal">
 
-  <div class="menu-toggle" onclick="toggleMenu()">☰ Menu</div>
-
-  <div class="layout">
-
-    <div class="sidebar student-sidebar" id="sidebar">
-      <h2><img src="/ennovate-logo.png" alt=""> CERP</h2>
-      <a href="/student-dashboard" class="active">Dashboard</a>
-      <a href="/student-catalog">Catalog</a>
-      <a href="/student-requests-page">My Requests</a>
-      <a href="/student-my-profile">My Profile</a>
-
-      <a href="#" onclick="logout()">Logout</a>
-      <div class="sidebar-footer">
-        <img src="/ennovate-logo.png" alt="">
-        <span>Student Portal</span>
-        <span style="display:block; margin-top:8px; opacity:0.8; font-size:9px;">Built by Jishnu Abbhay D</span>
-      </div>
-
-
-    </div>
-
-    <div class="content">
-      <h1>Dashboard</h1>
-      <p style="color:#64748b; margin-top:-16px; margin-bottom:20px; font-size:15px;">
-        Welcome, <strong id="studentName">Student</strong>
-        <span style="margin-left:8px; font-size:12px; color:#94a3b8;" id="studentUSN"></span>
-      </p>
-
-      <!-- Quick Request CTA -->
-      <div style="margin-bottom: 24px;">
-        <a href="/student-catalog" style="text-decoration:none;">
-          <button style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); font-size: 15px; padding: 14px 28px;">
-            📦 Browse & Request Components
-          </button>
-        </a>
-      </div>
-
-      <!-- Active Borrows -->
-      <div class="card" id="borrowsCard" style="border-left: 4px solid #2563eb;">
-        <h3 style="margin-top:0;">📋 Active Borrows</h3>
-        <div id="borrowsList">
-          <p style="color:#94a3b8; font-size:13px;">Loading...</p>
-        </div>
-      </div>
-
-      <!-- Pending Requests -->
-      <div class="card" id="pendingCard" style="border-left: 4px solid #f59e0b;">
-        <h3 style="margin-top:0;">⏳ Pending Requests</h3>
-        <div id="pendingList">
-          <p style="color:#94a3b8; font-size:13px;">Loading...</p>
-        </div>
-      </div>
-
-      <!-- Recent History -->
-      <div class="card" id="historyCard">
-        <h3 style="margin-top:0;">📜 Request History</h3>
-        <div id="historyList">
-          <p style="color:#94a3b8; font-size:13px;">Loading...</p>
-        </div>
-      </div>
-      <footer style="margin-top:60px; text-align:center; padding-bottom:20px; color:#94a3b8; font-size:11px;">
-        Built by Jishnu Abbhay D
-      </footer>
-    </div>
+  <div class="sp-topbar">
+    <button type="button" onclick="document.getElementById('sidebar').classList.toggle('is-open')">[ ≡ ]</button>
+    <span>MENU</span>
   </div>
 
+  <div class="sp-layout">
+    <aside class="sp-sidebar" id="sidebar">
+      <div class="sp-sidebar__head">
+        <img src="/ennovate-logo.png" alt="">
+        <span>CERP</span>
+      </div>
+      <nav class="sp-nav">
+        <a href="/student-dashboard" class="is-active">Dashboard</a>
+        <a href="/student-catalog">Catalog</a>
+        <a href="/student-requests-page">My Requests</a>
+        <a href="/student-my-profile">My Profile</a>
+        <a href="#" onclick="logout(); return false;">Logout</a>
+      </nav>
+      <div class="sp-sidebar__foot">
+        <img src="/ennovate-logo.png" alt="">
+        Student Portal<br>
+        Built by Jishnu Abbhay D
+      </div>
+    </aside>
 
-  <div id="toast"></div>
+    <main class="sp-main">
+      <h1 class="sp-title">DASHBOARD</h1>
+      <p class="sp-sub" id="welcomeSub">// Welcome, <span id="studentName">—</span> · <span id="studentUSN">—</span></p>
 
+      <div style="margin-bottom:28px;">
+        <a href="/student-catalog" class="sp-btn sp-btn--primary sp-interactive">[ Browse & Request Components ]</a>
+      </div>
+
+      <div class="sp-card" style="border-left:2px solid rgba(74,222,128,0.38);">
+        <h2 style="font-family:'Bebas Neue',sans-serif; font-size:20px; letter-spacing:2px; margin:0 0 16px;">Active Borrows</h2>
+        <div id="borrowsList"><p class="sp-sub" style="margin:0;">// loading</p></div>
+      </div>
+
+      <div class="sp-card" style="border-left:2px solid rgba(245,158,11,0.38); margin-top:16px;">
+        <h2 style="font-family:'Bebas Neue',sans-serif; font-size:20px; letter-spacing:2px; margin:0 0 16px;">Pending Requests</h2>
+        <div id="pendingList"><p class="sp-sub" style="margin:0;">// loading</p></div>
+      </div>
+
+      <div class="sp-card" style="margin-top:16px;">
+        <h2 style="font-family:'Bebas Neue',sans-serif; font-size:20px; letter-spacing:2px; margin:0 0 16px;">Request History</h2>
+        <div id="historyList"><p class="sp-sub" style="margin:0;">// loading</p></div>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast" class="sp-toast" role="status"></div>
+
+  <script src="/grain.js"></script>
+  <script src="/identity-strip.js"></script>
+  <script src="/student-cursor.js"></script>
+  <script src="/magnetic-buttons.js"></script>
+  <script src="/club-branding.js"></script>
+  <script src="/dark-mode.js"></script>
   <script>
-    function toggleMenu() {
-      document.getElementById("sidebar").classList.toggle("active");
-    }
-
     function showToast(message, success = true) {
-      const toast = document.getElementById("toast");
-      toast.style.background = success ? "#16a34a" : "#dc2626";
-      toast.innerText = message;
-      toast.style.display = "block";
-      setTimeout(() => toast.style.display = "none", 2500);
+      const t = document.getElementById("toast");
+      t.textContent = message;
+      t.className = "sp-toast is-visible " + (success ? "sp-toast--ok" : "sp-toast--err");
+      setTimeout(() => t.classList.remove("is-visible"), 2500);
     }
-
     async function logout() {
       await fetch("/student-logout", { method: "POST" });
       window.location.href = "/student-login.html";
     }
-
-    function statusBadge(status) {
-      const colors = {
-        PENDING: 'background:#f59e0b;color:#fff',
-        APPROVED: 'background:#16a34a;color:#fff',
-        REJECTED: 'background:#dc2626;color:#fff',
-        WITHDRAWN: 'background:#64748b;color:#fff',
-        CONFIRMED: 'background:#0891b2;color:#fff',
-        COMPLETED: 'background:#334155;color:#fff',
-        EXPIRED: 'background:#94a3b8;color:#fff',
-        DRAFT: 'background:#e2e8f0;color:#334155'
-      };
-      return `<span class="badge" style="${colors[status] || 'background:#e2e8f0;color:#334155'}">${status}</span>`;
+    function badgeClass(st) {
+      const g = ["APPROVED", "CONFIRMED", "COMPLETED"];
+      const a = ["PENDING", "DRAFT"];
+      const r = ["REJECTED", "WITHDRAWN", "EXPIRED"];
+      if (g.includes(st)) return "sp-badge sp-badge--green";
+      if (a.includes(st)) return "sp-badge sp-badge--amber";
+      if (r.includes(st)) return st === "WITHDRAWN" ? "sp-badge sp-badge--neutral" : "sp-badge sp-badge--red";
+      return "sp-badge sp-badge--neutral";
     }
-
+    function badgeHtml(st) {
+      return `<span class="${badgeClass(st)}">${st}</span>`;
+    }
     async function loadDashboard() {
-      // Load student info
       try {
         const sRes = await fetch("/student-session", { credentials: "same-origin" });
         if (sRes.status === 401) { window.location.href = "/student-login.html"; return; }
         const student = await sRes.json();
         document.getElementById("studentName").textContent = student.student_name;
-        document.getElementById("studentUSN").textContent = student.usn;
+        document.getElementById("studentUSN").textContent = (student.usn || "").toUpperCase();
       } catch (e) { window.location.href = "/student-login.html"; return; }
 
-      // Load dashboard data
       try {
         const res = await fetch("/api/student/dashboard", { credentials: "same-origin" });
         if (res.status === 401) { window.location.href = "/student-login.html"; return; }
         const data = await res.json();
 
-        // Borrows
-        const borrowsDiv = document.getElementById("borrowsList");
+        const bEl = document.getElementById("borrowsList");
         if (data.borrows.length === 0) {
-          borrowsDiv.innerHTML = '<p style="color:#94a3b8; font-size:13px;">No active borrows</p>';
+          bEl.innerHTML = '<p class="sp-sub" style="margin:0;">// no active borrows</p>';
         } else {
-          borrowsDiv.innerHTML = data.borrows.map(b => `
-            <div style="background:#f8fafc; padding:12px; border-radius:8px; margin-bottom:8px;">
-              <strong>${b.component_name}</strong>
-              <span style="float:right; font-weight:600; color:#2563eb;">${b.remaining} remaining</span>
-              <br><span style="font-size:12px; color:#64748b;">Issued: ${b.quantity} | Returned: ${b.returned_quantity}</span>
-            </div>
-          `).join('');
+          bEl.innerHTML = data.borrows.map(b => `
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; padding:12px 0; border-bottom:1px solid var(--border);">
+              <div>
+                <span style="font-family:Barlow,sans-serif; font-weight:600; font-size:13px;">${b.component_name}</span>
+                <span class="sp-badge sp-badge--green">IN USE</span>
+                <div style="font-family:'JetBrains Mono',monospace; font-size:8px; color:var(--dim); margin-top:6px;">// issued: ${b.quantity} · returned: ${b.returned_quantity}</div>
+              </div>
+              <span style="font-family:'Bebas Neue',sans-serif; font-size:34px; color:var(--white); line-height:1;">${b.remaining}</span>
+            </div>`).join("");
         }
 
-        // Pending
-        const pendingDiv = document.getElementById("pendingList");
+        const pEl = document.getElementById("pendingList");
         if (data.pending.length === 0) {
-          pendingDiv.innerHTML = '<p style="color:#94a3b8; font-size:13px;">No pending requests</p>';
+          pEl.innerHTML = '<p class="sp-sub" style="margin:0;">// no pending requests</p>';
         } else {
-          pendingDiv.innerHTML = data.pending.map(p => `
-            <div style="background:#fffbeb; padding:12px; border-radius:8px; margin-bottom:8px; border-left:3px solid #f59e0b;">
-              <strong>${p.component_name}</strong> × ${p.quantity}
-              ${statusBadge(p.status)}
-              ${p.purpose_note ? `<br><span style="font-size:12px; color:#64748b;">Note: ${p.purpose_note}</span>` : ''}
-              <br><span style="font-size:11px; color:#94a3b8;">${new Date(p.created_at).toLocaleString()}</span>
-            </div>
-          `).join('');
+          pEl.innerHTML = data.pending.map(p => `
+            <div style="padding:12px 0; border-bottom:1px solid var(--border);">
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                <span style="font-family:Barlow,sans-serif; font-weight:600; font-size:13px;">${p.component_name} × ${p.quantity}</span>
+                ${badgeHtml(p.status)}
+                <span style="font-family:'JetBrains Mono',monospace; font-size:8px; color:var(--dim); margin-left:auto;">${new Date(p.created_at).toLocaleString()}</span>
+              </div>
+              ${p.purpose_note ? `<div style="font-family:'JetBrains Mono',monospace; font-size:8px; color:var(--dim); margin-top:6px;">// ${escapeHtml(p.purpose_note)}</div>` : ""}
+            </div>`).join("");
         }
 
-        // History
-        const historyDiv = document.getElementById("historyList");
+        const hEl = document.getElementById("historyList");
         if (data.history.length === 0) {
-          historyDiv.innerHTML = '<p style="color:#94a3b8; font-size:13px;">No request history yet</p>';
+          hEl.innerHTML = '<p class="sp-sub" style="margin:0;">// no request history yet</p>';
         } else {
-          historyDiv.innerHTML = data.history.map(h => `
-            <div style="background:#f8fafc; padding:12px; border-radius:8px; margin-bottom:8px;">
-              <strong>${h.component_name}</strong> × ${h.quantity}
-              ${statusBadge(h.status)}
-              ${h.rejection_reason ? `<br><span style="font-size:12px; color:#dc2626;">Reason: ${h.rejection_reason}</span>` : ''}
-              <br><span style="font-size:11px; color:#94a3b8;">${new Date(h.created_at).toLocaleString()}</span>
-            </div>
-          `).join('');
+          hEl.innerHTML = data.history.map(h => `
+            <div style="padding:12px 0; border-bottom:1px solid var(--border);">
+              <span style="font-family:Barlow,sans-serif; font-weight:600; font-size:13px;">${h.component_name} × ${h.quantity}</span>
+              ${badgeHtml(h.status)}
+              ${h.rejection_reason ? `<div style="font-family:'JetBrains Mono',monospace; font-size:8px; color:rgba(248,113,113,0.6); margin-top:6px;">reason: ${escapeHtml(h.rejection_reason)}</div>` : ""}
+              <div style="font-family:'JetBrains Mono',monospace; font-size:8px; color:var(--dim); margin-top:6px;">${new Date(h.created_at).toLocaleString()}</div>
+            </div>`).join("");
         }
+        window.initStudentMagnetic();
       } catch (err) {
-        console.error("Dashboard error:", err);
+        console.error(err);
       }
     }
-
+    function escapeHtml(s) {
+      const d = document.createElement("div");
+      d.textContent = s;
+      return d.innerHTML;
+    }
     window.onload = loadDashboard;
   </script>
-
-<script src="/dark-mode.js"></script>
 </body>
 </html>

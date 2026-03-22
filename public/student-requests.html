@@ -1,244 +1,233 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="utf-8">
   <title>My Requests — CERP</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="/style.css">
-<script>if(localStorage.getItem("darkMode")=="true")document.documentElement.className="dark"</script>
-  <script src="/club-branding.js"></script>
+  <link rel="stylesheet" href="/student-style.css">
 </head>
-<body>
+<body class="student-portal">
 
-  <div class="menu-toggle" onclick="toggleMenu()">☰ Menu</div>
+  <div class="sp-topbar">
+    <button type="button" onclick="document.getElementById('sidebar').classList.toggle('is-open')">[ ≡ ]</button>
+    <span>MENU</span>
+  </div>
 
-  <div class="layout">
-
-    <div class="sidebar student-sidebar" id="sidebar">
-      <h2><img src="/ennovate-logo.png" alt=""> CERP</h2>
-      <a href="/student-dashboard">Dashboard</a>
-      <a href="/student-catalog">Catalog</a>
-      <a href="/student-requests-page" class="active">My Requests</a>
-      <a href="/student-my-profile">My Profile</a>
-      <hr>
-
-      <a href="#" onclick="logout()">Logout</a>
-      <div class="sidebar-footer">
+  <div class="sp-layout">
+    <aside class="sp-sidebar" id="sidebar">
+      <div class="sp-sidebar__head">
         <img src="/ennovate-logo.png" alt="">
-        <span>Student Portal</span>
-        <span style="display:block; margin-top:8px; opacity:0.8; font-size:9px;">Built by Jishnu Abbhay D</span>
+        <span>CERP</span>
       </div>
+      <nav class="sp-nav">
+        <a href="/student-dashboard">Dashboard</a>
+        <a href="/student-catalog">Catalog</a>
+        <a href="/student-requests-page" class="is-active">My Requests</a>
+        <a href="/student-my-profile">My Profile</a>
+        <a href="#" onclick="logout(); return false;">Logout</a>
+      </nav>
+      <div class="sp-sidebar__foot">
+        <img src="/ennovate-logo.png" alt="">
+        Student Portal<br>
+        Built by Jishnu Abbhay D
+      </div>
+    </aside>
 
-    </div>
-
-    <div class="content">
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px;">
+    <main class="sp-main">
+      <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:8px;">
         <div>
-          <h1 style="margin-bottom:4px;">My Requests</h1>
-          <p style="color:#64748b; font-size:14px; margin:0;">View and manage your component requests</p>
+          <h1 class="sp-title" style="margin-bottom:4px;">MY REQUESTS</h1>
+          <p class="sp-sub" style="margin:0;">// View and manage your component requests</p>
         </div>
-        <a href="/student-catalog" style="text-decoration:none;">
-          <button style="background:#1e293b;">+ New Request</button>
-        </a>
+        <a href="/student-catalog" class="sp-btn sp-btn--primary sp-interactive">[ + New Request ]</a>
       </div>
 
-      <!-- Filter tabs -->
-      <div style="display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap;">
-        <button onclick="setFilter('ALL')" id="filterAll" class="btn-sm" style="background:#0f172a;">All</button>
-        <button onclick="setFilter('PENDING')" id="filterPending" class="btn-sm" style="background:#f59e0b;">Pending</button>
-        <button onclick="setFilter('APPROVED')" id="filterApproved" class="btn-sm" style="background:#16a34a;">Approved</button>
-        <button onclick="setFilter('REJECTED')" id="filterRejected" class="btn-sm" style="background:#dc2626;">Rejected</button>
-        <button onclick="setFilter('WITHDRAWN')" id="filterWithdrawn" class="btn-sm" style="background:#64748b;">Withdrawn</button>
+      <div class="sp-filter-row" id="filterRow">
+        <button type="button" data-f="ALL" class="is-on" onclick="setFilter('ALL')">All</button>
+        <button type="button" data-f="PENDING" onclick="setFilter('PENDING')">Pending</button>
+        <button type="button" data-f="APPROVED" onclick="setFilter('APPROVED')">Approved</button>
+        <button type="button" data-f="REJECTED" onclick="setFilter('REJECTED')">Rejected</button>
+        <button type="button" data-f="WITHDRAWN" onclick="setFilter('WITHDRAWN')">Withdrawn</button>
       </div>
 
       <div id="requestsList"></div>
-      <footer style="margin-top:60px; text-align:center; padding-bottom:20px; color:#94a3b8; font-size:11px;">
-        Built by Jishnu Abbhay D
-      </footer>
-    </div>
+    </main>
   </div>
 
-
-  <!-- Edit Modal -->
-  <div class="modal-overlay" id="editModal">
-    <div class="modal-box">
+  <div id="editModal" class="sp-modal" role="dialog" aria-modal="true">
+    <div class="sp-modal-box" onclick="event.stopPropagation()">
       <h2>Edit Request</h2>
       <input type="hidden" id="editReqId">
+      <label class="sp-label" for="editComponent">Component</label>
+      <input id="editComponent" readonly style="opacity:0.5; cursor:not-allowed;">
 
-      <label>Component</label>
-      <input id="editComponent" readonly style="background:#f1f5f9; font-weight:600;">
-
-      <label>Quantity</label>
+      <label class="sp-label" for="editQuantity" style="margin-top:14px;">Quantity</label>
       <input id="editQuantity" type="number" min="1">
 
-      <label>Purpose / Note</label>
+      <label class="sp-label" for="editNote" style="margin-top:14px;">Purpose / Note</label>
       <textarea id="editNote" rows="3" style="resize:vertical;"></textarea>
 
-      <div class="modal-actions">
-        <button class="btn-cancel" onclick="closeEditModal()">Cancel</button>
-        <button onclick="saveEdit()">Save Changes</button>
+      <div style="display:flex; gap:12px; margin-top:20px;">
+        <button type="button" class="sp-btn sp-btn--secondary sp-interactive" onclick="closeEditModal()">[ Cancel ]</button>
+        <button type="button" class="sp-btn sp-btn--primary sp-interactive" onclick="saveEdit()">[ Save Changes ]</button>
       </div>
     </div>
   </div>
 
-  <div id="toast"></div>
+  <div id="toast" class="sp-toast" role="status"></div>
 
+  <script src="/grain.js"></script>
+  <script src="/identity-strip.js"></script>
+  <script src="/student-cursor.js"></script>
+  <script src="/magnetic-buttons.js"></script>
+  <script src="/club-branding.js"></script>
+  <script src="/dark-mode.js"></script>
   <script>
     let allRequests = [];
-    let currentFilter = 'ALL';
-
-    function toggleMenu() {
-      document.getElementById("sidebar").classList.toggle("active");
-    }
+    let currentFilter = "ALL";
 
     function showToast(message, success = true) {
-      const toast = document.getElementById("toast");
-      toast.style.background = success ? "#16a34a" : "#dc2626";
-      toast.innerText = message;
-      toast.style.display = "block";
-      setTimeout(() => toast.style.display = "none", 2500);
+      const t = document.getElementById("toast");
+      t.textContent = message;
+      t.className = "sp-toast is-visible " + (success ? "sp-toast--ok" : "sp-toast--err");
+      setTimeout(() => t.classList.remove("is-visible"), 2500);
     }
-
     async function logout() {
       await fetch("/student-logout", { method: "POST" });
       window.location.href = "/student-login.html";
     }
-
-    function statusBadge(status) {
-      const colors = {
-        PENDING: 'background:#f59e0b;color:#fff',
-        APPROVED: 'background:#16a34a;color:#fff',
-        REJECTED: 'background:#dc2626;color:#fff',
-        WITHDRAWN: 'background:#64748b;color:#fff',
-        CONFIRMED: 'background:#0891b2;color:#fff',
-        COMPLETED: 'background:#334155;color:#fff',
-        EXPIRED: 'background:#94a3b8;color:#fff',
-        DRAFT: 'background:#e2e8f0;color:#334155'
-      };
-      return `<span class="badge" style="${colors[status] || 'background:#e2e8f0;color:#334155'}">${status}</span>`;
+    function badgeClass(st) {
+      const g = ["APPROVED", "CONFIRMED"];
+      const a = ["PENDING", "DRAFT"];
+      const r = ["REJECTED"];
+      const w = ["WITHDRAWN", "EXPIRED"];
+      if (g.includes(st)) return "sp-badge sp-badge--green";
+      if (a.includes(st)) return "sp-badge sp-badge--amber";
+      if (r.includes(st)) return "sp-badge sp-badge--red";
+      if (w.includes(st)) return "sp-badge sp-badge--neutral";
+      return "sp-badge sp-badge--neutral";
     }
-
-    function setFilter(filter) {
-      currentFilter = filter;
+    function leftBorder(st) {
+      if (st === "APPROVED") return "rgba(74,222,128,0.4)";
+      if (st === "PENDING" || st === "DRAFT") return "rgba(245,158,11,0.4)";
+      if (st === "REJECTED") return "rgba(248,113,113,0.35)";
+      if (st === "CONFIRMED") return "rgba(255,255,255,0.2)";
+      return "rgba(255,255,255,0.08)";
+    }
+    function setFilter(f) {
+      currentFilter = f;
+      document.querySelectorAll("#filterRow button").forEach(b => {
+        b.classList.toggle("is-on", b.getAttribute("data-f") === f);
+      });
       renderRequests();
+      window.initStudentMagnetic();
     }
-
     async function loadRequests() {
       try {
         const res = await fetch("/api/student/requests", { credentials: "same-origin" });
         if (res.status === 401) { window.location.href = "/student-login.html"; return; }
         allRequests = await res.json();
         renderRequests();
-      } catch (err) {
-        console.error("Load requests error:", err);
-      }
+        window.initStudentMagnetic();
+      } catch (e) { console.error(e); }
     }
-
     function renderRequests() {
-      const filtered = currentFilter === 'ALL' ? allRequests : allRequests.filter(r => r.status === currentFilter);
-      const container = document.getElementById("requestsList");
-
+      const filtered = currentFilter === "ALL" ? allRequests : allRequests.filter(r => r.status === currentFilter);
+      const el = document.getElementById("requestsList");
       if (filtered.length === 0) {
-        container.innerHTML = '<div class="card"><p style="color:#94a3b8;">No requests found</p></div>';
+        el.innerHTML = '<div class="sp-card"><p class="sp-sub">// no requests found</p></div>';
         return;
       }
-
-      container.innerHTML = filtered.map(r => {
-        const canEdit = r.status === 'PENDING' || r.status === 'DRAFT';
-        const borderColor = { PENDING: '#f59e0b', APPROVED: '#16a34a', REJECTED: '#dc2626', WITHDRAWN: '#64748b', CONFIRMED: '#0891b2' }[r.status] || '#e2e8f0';
-
+      el.innerHTML = filtered.map(r => {
+        const canEdit = r.status === "PENDING" || r.status === "DRAFT";
+        const esc = (s) => {
+          const d = document.createElement("div");
+          d.textContent = s ?? "";
+          return d.innerHTML;
+        };
         return `
-          <div class="card" style="border-left: 4px solid ${borderColor};">
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+          <div class="sp-card" style="border-left:2px solid ${leftBorder(r.status)}; margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
               <div>
-                <strong style="font-size:15px;">${r.component_name}</strong> × ${r.quantity}
-                ${statusBadge(r.status)}
+                <span style="font-family:Barlow,sans-serif; font-weight:600; font-size:14px;">${esc(r.component_name)}</span>
+                <span class="${badgeClass(r.status)}">${r.status}</span>
               </div>
-              <span style="font-size:12px; color:#94a3b8;">${new Date(r.created_at).toLocaleString()}</span>
+              <span style="font-family:'JetBrains Mono',monospace; font-size:8px; color:var(--dim);">${new Date(r.created_at).toLocaleString()}</span>
             </div>
-            ${r.purpose_note ? `<p style="color:#64748b; font-size:13px; margin:8px 0 0;">📝 ${r.purpose_note}</p>` : ''}
-            ${r.rejection_reason ? `<p style="color:#dc2626; font-size:13px; margin:8px 0 0;">❌ Reason: ${r.rejection_reason}</p>` : ''}
-            ${r.confirmed_at ? `<p style="color:#0891b2; font-size:12px; margin:8px 0 0;">✅ Confirmed: ${new Date(r.confirmed_at).toLocaleString()}</p>` : ''}
+            ${r.purpose_note ? `<div style="font-family:'JetBrains Mono',monospace; font-size:8px; color:var(--dim); margin-top:8px;">// ${esc(r.purpose_note)}</div>` : ""}
+            ${r.rejection_reason ? `<div style="font-family:'JetBrains Mono',monospace; font-size:8px; color:rgba(248,113,113,0.6); margin-top:6px;">reason: ${esc(r.rejection_reason)}</div>` : ""}
+            ${r.confirmed_at ? `<div style="font-family:'JetBrains Mono',monospace; font-size:8px; color:rgba(255,255,255,0.4); margin-top:6px;">confirmed: ${new Date(r.confirmed_at).toLocaleString()}</div>` : ""}
             ${canEdit ? `
               <div style="margin-top:12px; display:flex; gap:8px;">
-                <button class="btn-sm btn-edit" onclick="openEditModal(${r.id}, '${r.component_name.replace(/'/g, "\\'")}', ${r.quantity}, '${(r.purpose_note || '').replace(/'/g, "\\'")}')">✏️ Edit</button>
-                <button class="btn-sm btn-delete" onclick="withdrawRequest(${r.id})">🚫 Withdraw</button>
-              </div>
-            ` : ''}
-          </div>
-        `;
-      }).join('');
+                <button type="button" class="sp-btn sp-btn--secondary sp-btn--sm sp-interactive" onclick="openEditModal(${r.id})">[ Edit ]</button>
+                <button type="button" class="sp-btn sp-btn--danger sp-btn--sm sp-interactive" onclick="withdrawRequest(${r.id})">[ Withdraw ]</button>
+              </div>` : ""}
+          </div>`;
+      }).join("");
+      window.initStudentMagnetic();
     }
 
-    function openEditModal(id, componentName, quantity, note) {
+    function openEditModal(id) {
+      const r = allRequests.find(x => x.id === id);
+      if (!r) return;
       document.getElementById("editReqId").value = id;
-      document.getElementById("editComponent").value = componentName;
-      document.getElementById("editQuantity").value = quantity;
-      document.getElementById("editNote").value = note;
-      document.getElementById("editModal").classList.add("active");
+      document.getElementById("editComponent").value = r.component_name;
+      document.getElementById("editQuantity").value = r.quantity;
+      document.getElementById("editNote").value = r.purpose_note || "";
+      document.getElementById("editModal").classList.add("is-open");
     }
-
     function closeEditModal() {
-      document.getElementById("editModal").classList.remove("active");
+      document.getElementById("editModal").classList.remove("is-open");
     }
-
     document.getElementById("editModal").addEventListener("click", function(e) {
       if (e.target === this) closeEditModal();
     });
 
     async function saveEdit() {
       const id = document.getElementById("editReqId").value;
-      const quantity = parseInt(document.getElementById("editQuantity").value);
+      const quantity = parseInt(document.getElementById("editQuantity").value, 10);
       const purpose_note = document.getElementById("editNote").value.trim();
-
       if (!quantity || quantity < 1) {
         showToast("Enter a valid quantity", false);
         return;
       }
-
       try {
-        const res = await fetch(`/api/student/request/${id}`, {
+        const res = await fetch("/api/student/request/" + id, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
           body: JSON.stringify({ quantity, purpose_note })
         });
         const data = await res.json();
-
         if (data.success) {
           showToast("Request updated");
           closeEditModal();
           loadRequests();
-        } else {
-          showToast(data.message, false);
-        }
-      } catch (err) {
+        } else showToast(data.message || "Error", false);
+      } catch (e) {
         showToast("Error updating request", false);
       }
     }
 
     async function withdrawRequest(id) {
-      if (!confirm("Are you sure you want to withdraw this request?")) return;
-
+      if (!confirm("Withdraw this request?")) return;
       try {
-        const res = await fetch(`/api/student/request/${id}/withdraw`, {
+        const res = await fetch("/api/student/request/" + id + "/withdraw", {
           method: "POST",
-          headers: { "Content-Type": "application/json" }
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin"
         });
         const data = await res.json();
-
         if (data.success) {
           showToast("Request withdrawn");
           loadRequests();
-        } else {
-          showToast(data.message, false);
-        }
-      } catch (err) {
-        showToast("Error withdrawing request", false);
+        } else showToast(data.message || "Error", false);
+      } catch (e) {
+        showToast("Error", false);
       }
     }
 
     window.onload = loadRequests;
   </script>
-
-<script src="/dark-mode.js"></script>
 </body>
 </html>

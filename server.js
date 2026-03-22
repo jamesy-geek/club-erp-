@@ -158,9 +158,13 @@ function requireAdmin(req, res, next) {
   }
 }
 
+const STUDENT_HTML_PATHS = ["/student-dashboard", "/student-catalog", "/student-requests-page", "/student-my-profile"];
+
 function requireStudent(req, res, next) {
   if (req.session && req.session.student_id) {
     next();
+  } else if (req.method === "GET" && STUDENT_HTML_PATHS.includes(req.path)) {
+    res.redirect(302, "/student-login.html");
   } else {
     return res.status(401).json({ message: "Unauthorized" });
   }
@@ -386,6 +390,10 @@ app.get("/debug-env", (req, res) => {
     VERCEL: !!process.env.VERCEL,
     DB_READY_FLAG: dbReady
   });
+});
+
+app.get("/student-login", (req, res) => {
+  res.redirect(302, "/student-login.html");
 });
 
 
@@ -1392,6 +1400,62 @@ app.get("/api/student/dashboard", requireStudent, async (req, res) => {
     res.json({ borrows: borrows.rows, pending: pending.rows, history: history.rows });
   } catch (err) {
     console.error("Student dashboard error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Profile page: stats, active hold rows, monthly request counts (last 8 months)
+app.get("/api/student/profile-summary", requireStudent, async (req, res) => {
+  try {
+    const sid = req.session.student_id;
+    const totalIssued = await db.execute({
+      sql: `SELECT COALESCE(SUM(ii.quantity), 0) AS n FROM issue_items ii
+            JOIN issues i ON ii.issue_id = i.id WHERE i.student_id = ?`,
+      args: [sid]
+    });
+    const totalReturned = await db.execute({
+      sql: `SELECT COALESCE(SUM(ii.returned_quantity), 0) AS n FROM issue_items ii
+            JOIN issues i ON ii.issue_id = i.id WHERE i.student_id = ?`,
+      args: [sid]
+    });
+    const activeHolds = await db.execute({
+      sql: `SELECT COALESCE(SUM(ii.quantity - ii.returned_quantity), 0) AS n FROM issue_items ii
+            JOIN issues i ON ii.issue_id = i.id WHERE i.student_id = ?`,
+      args: [sid]
+    });
+    const requestsMade = await db.execute({
+      sql: `SELECT COUNT(*) AS n FROM component_requests WHERE student_id = ?`,
+      args: [sid]
+    });
+    const holdsDetail = await db.execute({
+      sql: `SELECT c.name AS component_name, c.total_quantity AS component_total,
+              (ii.quantity - ii.returned_quantity) AS held
+            FROM issue_items ii
+            JOIN issues i ON ii.issue_id = i.id
+            JOIN components c ON ii.component_id = c.id
+            WHERE i.student_id = ? AND (ii.quantity - ii.returned_quantity) > 0`,
+      args: [sid]
+    });
+    const monthly = await db.execute({
+      sql: `SELECT strftime('%Y-%m', created_at) AS ym, COUNT(*) AS cnt
+            FROM component_requests WHERE student_id = ?
+            GROUP BY ym ORDER BY ym ASC`,
+      args: [sid]
+    });
+    const rows = monthly.rows || [];
+    const last8 = rows.slice(-8);
+    res.json({
+      stats: {
+        totalBorrowed: Number(totalIssued.rows[0].n) || 0,
+        totalReturned: Number(totalReturned.rows[0].n) || 0,
+        activeHolds: Number(activeHolds.rows[0].n) || 0,
+        requestsMade: Number(requestsMade.rows[0].n) || 0
+      },
+      activeHoldRows: holdsDetail.rows,
+      monthlyRequests: last8
+    });
+  } catch (err) {
+    console.error("Profile summary error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });

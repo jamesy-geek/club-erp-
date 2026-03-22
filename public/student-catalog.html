@@ -1,112 +1,95 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="utf-8">
   <title>Component Catalog — CERP</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="/style.css">
-<script>if(localStorage.getItem("darkMode")=="true")document.documentElement.className="dark"</script>
+  <link rel="stylesheet" href="/student-style.css">
 </head>
-<body>
+<body class="student-portal">
 
-  <div class="menu-toggle" onclick="toggleMenu()">☰ Menu</div>
+  <div class="sp-topbar">
+    <button type="button" onclick="document.getElementById('sidebar').classList.toggle('is-open')">[ ≡ ]</button>
+    <span>MENU</span>
+  </div>
 
-  <div class="layout">
-
-    <div class="sidebar student-sidebar" id="sidebar">
-      <h2><img src="/ennovate-logo.png" alt=""> CERP</h2>
-      <a href="/student-dashboard">Dashboard</a>
-      <a href="/student-catalog" class="active">Catalog</a>
-      <a href="/student-requests-page">My Requests</a>
-      <a href="/student-my-profile">My Profile</a>
-      <hr>
-      <a href="#" onclick="logout()">Logout</a>
-
-      <div class="sidebar-footer">
+  <div class="sp-layout">
+    <aside class="sp-sidebar" id="sidebar">
+      <div class="sp-sidebar__head">
         <img src="/ennovate-logo.png" alt="">
-        <span>Student Portal</span>
-        <span style="display:block; margin-top:8px; opacity:0.8; font-size:9px;">Built by Jishnu Abbhay D</span>
+        <span>CERP</span>
       </div>
-
-    </div>
-
-    <div class="content">
-      <h1>Component Catalog</h1>
-      <p style="color:#64748b; margin-top:-16px; margin-bottom:20px; font-size:14px;">Browse available components and submit your request</p>
-
-      <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
-        <input type="text" id="searchInput" placeholder="🔍 Search components..." onkeyup="filterCatalog()" style="margin-bottom:0; flex:1;">
-        <!-- Cart Toggle (Only for desktop) -->
-        <button id="cartToggleDesktop" onclick="toggleCartDrawer()" style="margin-left: 12px; display: none;">🛒 <span id="cartCountDesktop">0</span> Items</button>
-      </div>
-
-      <div id="catalogGrid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
-      </div>
-
-      <footer style="margin-top:60px; text-align:center; padding-bottom:20px; color:#94a3b8; font-size:11px;">
+      <nav class="sp-nav">
+        <a href="/student-dashboard">Dashboard</a>
+        <a href="/student-catalog" class="is-active">Catalog</a>
+        <a href="/student-requests-page">My Requests</a>
+        <a href="/student-my-profile">My Profile</a>
+        <a href="#" onclick="logout(); return false;">Logout</a>
+      </nav>
+      <div class="sp-sidebar__foot">
+        <img src="/ennovate-logo.png" alt="">
+        Student Portal<br>
         Built by Jishnu Abbhay D
-      </footer>
-    </div>
-  </div>
-
-  <!-- Cart Drawer -->
-  <div id="cartOverlay" onclick="toggleCartDrawer()" style="position:fixed; inset:0; background:rgba(15,23,42,0.4); z-index:1050; display:none;"></div>
-  <div id="cartDrawer" style="position:fixed; top:0; right:-400px; width:400px; max-width:100%; height:100%; background:#fff; border-left:1px solid #e2e8f0; box-shadow:-5px 0 25px rgba(0,0,0,0.15); z-index:1100; transition:right 0.3s cubic-bezier(0.4, 0, 0.2, 1); display:flex; flex-direction:column;">
-    <div style="padding:20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
-      <h2 style="margin:0;">🛒 Your Cart</h2>
-      <button onclick="toggleCartDrawer()" style="background:transparent; color:var(--text); font-size:24px; padding:0; height:auto; width:auto; border:none; box-shadow:none;">&times;</button>
-    </div>
-    <div id="cartItemsList" style="flex:1; overflow-y:auto; padding:20px;">
-      <!-- JavaScript will populate this -->
-      <p style="color:#94a3b8; text-align:center; margin-top:40px;">Your cart is empty.</p>
-    </div>
-    <div style="padding:20px; border-top:1px solid var(--border); background:#f8fafc;">
-      <div class="dark:bg-#1e293b">
-        <label style="font-size:13px; font-weight:600; color:#64748b;">Purpose / Note (optional)</label>
-        <textarea id="cartPurposeNote" rows="2" placeholder="e.g., For project, hackathon..." style="resize:none; margin-top:5px; margin-bottom:15px;"></textarea>
       </div>
-      <button id="submitBulkRequestBtn" onclick="submitCart()" style="width:100%; justify-content:center; background:#1e293b; padding:14px;" disabled>
-        Submit Request
-      </button>
+    </aside>
+
+    <main class="sp-main">
+      <h1 class="sp-title">CATALOG</h1>
+      <p class="sp-sub">// Browse available components & add to cart</p>
+
+      <div class="sp-card" style="display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-bottom:0;">
+        <input type="text" id="searchInput" placeholder="Search components..." oninput="filterCatalog()" style="flex:1; min-width:200px; margin:0;">
+        <button type="button" id="cartToggleDesktop" class="sp-btn sp-btn--primary sp-interactive" style="display:none;" onclick="toggleCartDrawer()">[ Cart <span id="cartCountDesktop">0</span> ]</button>
+      </div>
+
+      <div class="sp-cat-grid" id="catalogGrid" style="margin-top:1px;"></div>
+    </main>
+  </div>
+
+  <div id="cartOverlay" class="sp-cart-overlay" onclick="toggleCartDrawer()"></div>
+  <div id="cartDrawer" class="sp-cart-drawer">
+    <div style="padding:20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+      <h2 style="font-family:'Bebas Neue',sans-serif; font-size:28px; letter-spacing:3px; margin:0;">CART</h2>
+      <button type="button" class="sp-btn sp-btn--secondary no-magnetic" onclick="toggleCartDrawer()">[ × ]</button>
+    </div>
+    <div id="cartItemsList" style="flex:1; overflow-y:auto; padding:20px;"></div>
+    <div style="padding:20px; border-top:1px solid var(--border);">
+      <label class="sp-label" for="cartPurposeNote">Purpose / Note (optional)</label>
+      <textarea id="cartPurposeNote" rows="3" style="resize:none; width:100%; box-sizing:border-box;"></textarea>
+      <button type="button" id="submitBulkRequestBtn" class="sp-btn sp-btn--primary sp-btn--block sp-interactive" style="margin-top:16px;" disabled onclick="submitCart()">[ Submit Request ]</button>
     </div>
   </div>
 
-  <!-- Floating Cart FAB (For Mobile) -->
-  <div id="cartFAB" onclick="toggleCartDrawer()" style="position:fixed; bottom:30px; right:30px; width:64px; height:64px; border-radius:50%; background:#1e293b; color:white; display:flex; align-items:center; justify-content:center; box-shadow:0 8px 30px rgba(0,0,0,0.2); cursor:pointer; z-index:1000; transition:0.2s;">
-    <span style="font-size:24px;">🛒</span>
-    <span id="cartBadgeCount" style="position:absolute; top:-5px; right:-5px; background:#dc2626; color:white; font-size:11px; font-weight:bold; width:22px; height:22px; border-radius:50%; display:none; align-items:center; justify-content:center; border:2px solid white;">0</span>
-  </div>
+  <button type="button" id="cartFAB" class="sp-fab sp-interactive" onclick="toggleCartDrawer()" aria-label="Open cart">
+    <span style="font-size:18px;">⬡</span>
+    <span id="cartBadgeCount" class="sp-fab-badge">0</span>
+  </button>
 
-  <div id="toast"></div>
+  <div id="toast" class="sp-toast" role="status"></div>
 
+  <script src="/grain.js"></script>
+  <script src="/identity-strip.js"></script>
+  <script src="/student-cursor.js"></script>
+  <script src="/magnetic-buttons.js"></script>
   <script src="/club-branding.js"></script>
+  <script src="/dark-mode.js"></script>
   <script>
     let allComponents = [];
-    let cart = []; // Array of { component_id, component_name, quantity, available_quantity }
-
-    function toggleMenu() {
-      document.getElementById("sidebar").classList.toggle("active");
-    }
+    let cart = [];
 
     function toggleCartDrawer() {
-      const drawer = document.getElementById("cartDrawer");
-      const overlay = document.getElementById("cartOverlay");
-      if (drawer.style.right === "0px") {
-        drawer.style.right = "-400px";
-        overlay.style.display = "none";
-        document.body.style.overflow = "auto";
-      } else {
-        drawer.style.right = "0px";
-        overlay.style.display = "block";
-        document.body.style.overflow = "hidden";
-      }
+      const d = document.getElementById("cartDrawer");
+      const o = document.getElementById("cartOverlay");
+      const open = d.classList.toggle("is-open");
+      o.classList.toggle("is-open", open);
+      document.body.style.overflow = open ? "hidden" : "";
     }
 
     function showToast(message, success = true) {
-      const toast = document.getElementById("toast");
-      toast.style.background = success ? "#16a34a" : "#dc2626";
-      toast.innerText = message;
-      toast.style.display = "block";
-      setTimeout(() => toast.style.display = "none", 3000);
+      const t = document.getElementById("toast");
+      t.textContent = message;
+      t.className = "sp-toast is-visible " + (success ? "sp-toast--ok" : "sp-toast--err");
+      setTimeout(() => t.classList.remove("is-visible"), 2500);
     }
 
     async function logout() {
@@ -120,193 +103,166 @@
         if (res.status === 401) { window.location.href = "/student-login.html"; return; }
         allComponents = await res.json();
         renderCatalog(allComponents);
-      } catch (err) {
-        console.error("Catalog error:", err);
-      }
+      } catch (e) { console.error(e); }
     }
 
     function filterCatalog() {
-      const query = document.getElementById("searchInput").value.toLowerCase();
-      const filtered = allComponents.filter(c => c.name.toLowerCase().includes(query));
-      renderCatalog(filtered);
+      const q = document.getElementById("searchInput").value.toLowerCase();
+      renderCatalog(allComponents.filter(c => c.name.toLowerCase().includes(q)));
+    }
+
+    function availBadge(c) {
+      if (c.available_quantity <= 0) return '<span class="sp-badge sp-badge--red">Out of Stock</span>';
+      if (c.available_quantity < 5) return '<span class="sp-badge sp-badge--amber">Low Stock</span>';
+      return '<span class="sp-badge sp-badge--green">Available</span>';
     }
 
     function renderCatalog(components) {
       const grid = document.getElementById("catalogGrid");
       if (components.length === 0) {
-        grid.innerHTML = '<div class="card"><p style="color:#94a3b8;">No components found</p></div>';
+        grid.innerHTML = '<div class="sp-cat-card"><div class="sp-cat-card-inner"><p class="sp-sub">// no components found</p></div></div>';
         return;
       }
       grid.innerHTML = components.map(c => {
         const inStock = c.available_quantity > 0;
-        const cartItem = cart.find(item => item.component_id === c.id);
-        const inCart = !!cartItem;
-
-        return `
-          <div class="card" style="display:flex; flex-direction:column; justify-content:space-between; border:${inCart ? '2px solid #2563eb' : 'none'}; box-shadow:${inCart ? '0 8px 30px rgba(37, 99, 235, 0.1)' : '0 2px 4px rgba(0,0,0,0.05)'};">
-            <div>
-              ${c.photo1 ? `<img src="${c.photo1}" style="width:100%; height:120px; object-fit:cover; border-radius:8px; margin-bottom:12px;">` : ''}
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                <strong style="font-size:15px;">${c.name}</strong>
-                <span class="badge" style="background:${inStock ? '#16a34a' : '#94a3b8'}; color:#fff; font-size:11px;">
-                  ${inStock ? `${c.available_quantity} Avl` : 'Out of Stock'}
-                </span>
-              </div>
-              <p style="color:#64748b; font-size:13px; margin:0;">Total: ${c.total_quantity} | Available: ${c.available_quantity}</p>
+        const ci = cart.find(x => x.component_id === c.id);
+        const inCart = !!ci;
+        const img = c.photo1
+          ? `<img class="sp-cat-img" src="${escapeAttr(c.photo1)}" alt="">`
+          : `<div class="sp-cat-img-ph">// NO IMG</div>`;
+        let actions = "";
+        if (!inStock) {
+          actions = `<button type="button" class="sp-btn sp-btn--secondary sp-btn--block" disabled style="opacity:0.5; cursor:not-allowed; margin-top:12px; border-color:rgba(255,255,255,0.05); color:var(--dim);">[ Out of Stock ]</button>`;
+        } else if (!inCart) {
+          actions = `<button type="button" class="sp-btn sp-btn--primary sp-btn--block sp-interactive" style="margin-top:12px;" onclick="addToCart(${c.id})">[ Add to Cart ]</button>`;
+        } else {
+          actions = `
+            <div style="display:flex; align-items:center; gap:8px; margin-top:12px;">
+              <button type="button" class="sp-btn sp-btn--secondary sp-interactive" onclick="updateCartQty(${c.id},-1)">−</button>
+              <span style="font-family:'Bebas Neue',sans-serif; font-size:22px; flex:1; text-align:center;">${ci.quantity}</span>
+              <button type="button" class="sp-btn sp-btn--secondary sp-interactive" onclick="updateCartQty(${c.id},1)">+</button>
             </div>
-            
-            ${!inStock ? `
-               <button disabled style="margin-top:14px; background: #94a3b8; width:100%; justify-content:center;">Out of Stock</button>
-            ` : (inCart ? `
-               <div style="display:flex; gap:8px; margin-top:14px;">
-                  <div style="display:flex; align-items:center; background:#f1f5f9; border-radius:8px; flex:1; justify-content:space-between; padding:0 10px;">
-                    <button onclick="updateCartQty(${c.id}, -1)" style="background:transparent; color:#1e293b; padding:8px 12px; height:auto; border:none; box-shadow:none;">-</button>
-                    <span style="font-weight:bold; font-size:14px;">${cartItem.quantity}</span>
-                    <button onclick="updateCartQty(${c.id}, 1)" style="background:transparent; color:#1e293b; padding:8px 12px; height:auto; border:none; box-shadow:none;">+</button>
-                  </div>
-                  <button onclick="removeFromCart(${c.id})" style="background:#ef4444; width:48px; min-width:unset; align-items:center; justify-content:center;">🗑️</button>
-               </div>
-            ` : `
-               <button onclick="addToCart(${c.id}, '${c.name.replace(/'/g, "\\'")}', ${c.available_quantity})" style="margin-top:14px; background: #1e293b; width:100%; justify-content:center;">
-                🛒 Add to Cart
-              </button>
-            `)}
-          </div>
-        `;
-      }).join('');
+            <button type="button" class="sp-btn sp-btn--danger sp-btn--block sp-interactive" style="margin-top:8px;" onclick="removeFromCart(${c.id})">[ Remove ]</button>`;
+        }
+        return `
+          <div class="sp-cat-card sp-card">
+            ${img}
+            <div class="sp-cat-card-inner">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+                <span style="font-family:Barlow,sans-serif; font-weight:600; font-size:14px; color:var(--white);">${escapeHtml(c.name)}</span>
+                ${availBadge(c)}
+              </div>
+              <p style="font-family:'JetBrains Mono',monospace; font-size:8px; color:var(--dim); margin:8px 0 0;">total: ${c.total_quantity} · available: ${c.available_quantity}</p>
+              ${actions}
+            </div>
+          </div>`;
+      }).join("");
+      window.initStudentMagnetic();
     }
 
-    // --- Cart Actions ---
+    function escapeHtml(t) {
+      const d = document.createElement("div");
+      d.textContent = t;
+      return d.innerHTML;
+    }
+    function escapeAttr(t) {
+      return String(t).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+    }
 
-    function addToCart(component_id, component_name, available_quantity) {
-      cart.push({ component_id, component_name, quantity: 1, available_quantity });
+    function addToCart(component_id) {
+      const c = allComponents.find(x => x.id === component_id);
+      if (!c) return;
+      cart.push({ component_id, component_name: c.name, quantity: 1, available_quantity: c.available_quantity });
       updateUI();
       renderCatalog(allComponents);
-      
-      // Pulse animation for the FAB
       const fab = document.getElementById("cartFAB");
-      fab.style.transform = "scale(1.15)";
-      setTimeout(() => fab.style.transform = "scale(1)", 200);
+      fab.style.transform = "scale(1.12)";
+      setTimeout(() => { fab.style.transform = ""; }, 200);
     }
-
     function removeFromCart(component_id) {
-      cart = cart.filter(item => item.component_id !== component_id);
+      cart = cart.filter(i => i.component_id !== component_id);
       updateUI();
       renderCatalog(allComponents);
     }
-
     function updateCartQty(component_id, delta) {
       const item = cart.find(i => i.component_id === component_id);
       if (!item) return;
-      
-      const newQty = item.quantity + delta;
-      
-      // Check stock limit
-      if (newQty > item.available_quantity) {
-        showToast(`Only ${item.available_quantity} available in stock`, false);
-        return;
-      }
-      
-      // Check global borrow limit (we'll fetch this from settings in catalog load if we wanted, but let's assume 5 for now as a safeguard)
-      if (newQty > 5) {
-        showToast("Max limit is 5 per item", false);
-        return;
-      }
-
-      if (newQty <= 0) {
-        removeFromCart(component_id);
-      } else {
-        item.quantity = newQty;
-        updateUI();
-        renderCatalog(allComponents);
-      }
+      const nq = item.quantity + delta;
+      if (nq > item.available_quantity) { showToast("Only " + item.available_quantity + " available", false); return; }
+      if (nq > 5) { showToast("Max limit is 5 per item", false); return; }
+      if (nq <= 0) removeFromCart(component_id);
+      else { item.quantity = nq; updateUI(); renderCatalog(allComponents); }
     }
 
     function updateUI() {
-      // 1. Update Badge
+      const n = cart.length;
       const badge = document.getElementById("cartBadgeCount");
-      const desktopCount = document.getElementById("cartCountDesktop");
-      const totalItems = cart.length;
-
-      if (totalItems > 0) {
-        badge.innerText = totalItems;
+      const desk = document.getElementById("cartToggleDesktop");
+      const deskN = document.getElementById("cartCountDesktop");
+      document.getElementById("submitBulkRequestBtn").disabled = n === 0;
+      if (n > 0) {
+        badge.textContent = n;
         badge.style.display = "flex";
-        desktopCount.innerText = totalItems;
-        document.getElementById("cartToggleDesktop").style.display = "flex";
-        document.getElementById("submitBulkRequestBtn").disabled = false;
+        deskN.textContent = n;
+        desk.style.display = "inline-flex";
       } else {
         badge.style.display = "none";
-        document.getElementById("cartToggleDesktop").style.display = "none";
-        document.getElementById("submitBulkRequestBtn").disabled = true;
+        desk.style.display = "none";
       }
-
-      // 2. Update Drawer List
       const list = document.getElementById("cartItemsList");
       if (cart.length === 0) {
-        list.innerHTML = '<p style="color:#94a3b8; text-align:center; margin-top:40px;">Your cart is empty.</p>';
+        list.innerHTML = '<p class="sp-sub" style="text-align:center; margin-top:40px;">// cart empty</p>';
         return;
       }
-
       list.innerHTML = cart.map(item => `
-        <div style="background:#fff; border-radius:12px; padding:15px; margin-bottom:12px; box-shadow:0 2px 8px rgba(0,0,0,0.04); border:1px solid #f1f5f9;">
-          <div style="display:flex; justify-content:space-between; align-items:start;">
+        <div class="sp-card" style="margin-bottom:12px;">
+          <div style="display:flex; justify-content:space-between;">
             <div>
-              <strong style="display:block; font-size:15px;">${item.component_name}</strong>
-              <span style="color:#64748b; font-size:12px;">Stock: ${item.available_quantity} available</span>
+              <div style="font-family:Barlow,sans-serif; font-weight:600; font-size:13px;">${escapeHtml(item.component_name)}</div>
+              <div style="font-family:'JetBrains Mono',monospace; font-size:8px; color:var(--dim);">// stock: ${item.available_quantity}</div>
             </div>
-            <button onclick="removeFromCart(${item.component_id})" style="background:transparent; color:#64748b; font-size:14px; padding:0; height:auto; width:auto; border:none; box-shadow:none;">&times;</button>
+            <button type="button" class="sp-btn sp-btn--secondary sp-btn--sm no-magnetic" onclick="removeFromCart(${item.component_id})">×</button>
           </div>
-          <div style="display:flex; align-items:center; margin-top:12px; gap:15px;">
-            <div style="display:flex; align-items:center; background:#f8fafc; border-radius:8px; width:100px; justify-content:space-between; padding:4px 8px;">
-               <button onclick="updateCartQty(${item.component_id}, -1)" style="background:transparent; color:#1e293b; padding:4px 8px; font-weight:bold; height:auto; border:none; box-shadow:none;">-</button>
-               <span style="font-weight:bold; font-size:14px;">${item.quantity}</span>
-               <button onclick="updateCartQty(${item.component_id}, 1)" style="background:transparent; color:#1e293b; padding:4px 8px; font-weight:bold; height:auto; border:none; box-shadow:none;">+</button>
-            </div>
+          <div style="display:flex; align-items:center; gap:12px; margin-top:12px;">
+            <button type="button" class="sp-btn sp-btn--secondary sp-interactive" onclick="updateCartQty(${item.component_id},-1)">−</button>
+            <span style="font-family:'Bebas Neue',sans-serif; font-size:22px;">${item.quantity}</span>
+            <button type="button" class="sp-btn sp-btn--secondary sp-interactive" onclick="updateCartQty(${item.component_id},1)">+</button>
           </div>
-        </div>
-      `).join('');
+        </div>`).join("");
+      window.initStudentMagnetic();
     }
 
     async function submitCart() {
       if (cart.length === 0) return;
-      
       const purpose_note = document.getElementById("cartPurposeNote").value.trim();
       const items = cart.map(i => ({ component_id: i.component_id, quantity: i.quantity }));
-      
-      document.getElementById("submitBulkRequestBtn").innerText = "⏳ Processing...";
-      document.getElementById("submitBulkRequestBtn").disabled = true;
-
+      const btn = document.getElementById("submitBulkRequestBtn");
+      btn.disabled = true;
+      btn.innerHTML = "[ Processing… ]";
       try {
         const res = await fetch("/api/student/request-bulk", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
           body: JSON.stringify({ items, purpose_note })
         });
         const data = await res.json();
-
         if (data.success) {
-          showToast(data.message);
+          showToast(data.message || "Submitted");
           cart = [];
           document.getElementById("cartPurposeNote").value = "";
           updateUI();
           renderCatalog(allComponents);
           toggleCartDrawer();
-        } else {
-          showToast(data.message, false);
-          document.getElementById("submitBulkRequestBtn").innerText = "Submit Request";
-          document.getElementById("submitBulkRequestBtn").disabled = false;
-        }
-      } catch (err) {
+        } else showToast(data.message || "Error", false);
+      } catch (e) {
         showToast("Error submitting request", false);
-        document.getElementById("submitBulkRequestBtn").innerText = "Submit Request";
-        document.getElementById("submitBulkRequestBtn").disabled = false;
       }
+      btn.innerHTML = "[ Submit Request ]";
+      btn.disabled = cart.length === 0;
     }
 
     window.onload = loadCatalog;
   </script>
-
-<script src="/dark-mode.js"></script>
 </body>
 </html>
-

@@ -1,73 +1,76 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="utf-8">
   <title>Student Login — CERP</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="/style.css">
-<script>if(localStorage.getItem("darkMode")=="true")document.documentElement.className="dark"</script>
+  <link rel="stylesheet" href="/student-style.css">
 </head>
-<body>
+<body class="student-portal sp-login-body">
 
-  <div class="layout" style="justify-content:center;align-items:center;">
-    <div style="text-align: center;">
-      <img src="/ennovate-logo.png" alt=".ennovate" style="width: 140px; margin-bottom: 8px; opacity: 0.85;">
-      <p id="clubTagline" style="color: #64748b; font-size: 12px; margin-bottom: 24px; letter-spacing: 0.5px;">Student Portal</p>
+  <div class="sp-login-page">
+    <div style="text-align:center; margin-bottom:24px;">
+      <img src="/ennovate-logo.png" alt="Ennovate" width="52" height="52" style="filter:invert(1); width:52px; height:auto;">
+      <p class="sp-sub" style="margin-top:16px;">// Student Portal · CERP</p>
+    </div>
 
-      <script src="/club-branding.js"></script>
+    <div class="sp-login-card">
+      <h1>LOGIN</h1>
+      <p class="sp-login-sub">Sign in with your student account</p>
 
-      <div class="card" style="width:340px; text-align: left;">
-        <h2 style="text-align: center; margin-bottom: 6px;">Student Login</h2>
-        <p style="text-align: center; color: #94a3b8; font-size: 12px; margin-bottom: 18px;">Sign in with your student account</p>
+      <label class="sp-label" for="email">Email</label>
+      <input id="email" type="email" autocomplete="username" placeholder="your.email@example.com">
 
-        <label>Email</label>
-        <input id="email" type="email" placeholder="your.email@example.com">
-
-        <label>Password</label>
-        <div class="password-wrapper" style="position: relative;">
-          <input id="password" type="password" placeholder="Password" style="padding-right: 40px;">
-          <span id="togglePassword" onclick="togglePasswordVisibility()" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; opacity: 0.5; font-size: 18px; user-select: none;">👁️</span>
-        </div>
-
-        <div id="errorMsg" style="color: #dc2626; font-size: 13px; margin-top: 8px; display: none;"></div>
-
-        <button onclick="studentLogin()" style="width: 100%; justify-content: center; margin-top: 12px;">Sign In</button>
+      <label class="sp-label" for="password" style="margin-top:14px;">Password</label>
+      <div class="password-wrap" style="position:relative;">
+        <input id="password" type="password" autocomplete="current-password" placeholder="Password" style="padding-right:40px;">
+        <button type="button" class="no-magnetic" onclick="togglePw()" style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:transparent; border:none; color:var(--dim); cursor:pointer; font-size:14px;" aria-label="Toggle password">👁</button>
       </div>
 
-      <p style="margin-top: 16px;">
-        <a href="/login.html" style="color: #64748b; font-size: 13px; text-decoration: none;">Admin Login →</a>
-      </p>
-      <p style="color: #94a3b8; font-size: 10px; margin-top: 8px;">Built by Jishnu Abbhay D</p>
+      <div id="errorMsg" class="sp-login-error"></div>
+
+      <button type="button" class="sp-btn sp-btn--primary sp-btn--block" style="margin-top:20px;" onclick="studentLogin()">[ Sign In ]</button>
+    </div>
+
+    <div class="sp-login-links">
+      <a href="/login.html">Admin Login →</a>
+      <p class="sp-login-built">// Built by Jishnu Abbhay D</p>
     </div>
   </div>
 
-  <script>
-    function togglePasswordVisibility() {
-      const passwordInput = document.getElementById("password");
-      const toggleIcon = document.getElementById("togglePassword");
-      if (passwordInput.type === "password") {
-        passwordInput.type = "text";
-        toggleIcon.textContent = "🙈";
-      } else {
-        passwordInput.type = "password";
-        toggleIcon.textContent = "👁️";
-      }
-    }
+  <div id="toast" class="sp-toast" role="status"></div>
 
-    // Allow enter key
+  <script src="/grain.js"></script>
+  <script src="/identity-strip.js"></script>
+  <script src="/student-cursor.js"></script>
+  <script src="/magnetic-buttons.js"></script>
+  <script src="/club-branding.js"></script>
+  <script src="/dark-mode.js"></script>
+  <script>
+    function togglePw() {
+      const p = document.getElementById("password");
+      p.type = p.type === "password" ? "text" : "password";
+    }
     document.getElementById("password").addEventListener("keydown", e => { if (e.key === "Enter") studentLogin(); });
     document.getElementById("email").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("password").focus(); });
+
+    function showToast(message, success = true) {
+      const t = document.getElementById("toast");
+      t.textContent = message;
+      t.className = "sp-toast is-visible " + (success ? "sp-toast--ok" : "sp-toast--err");
+      setTimeout(() => t.classList.remove("is-visible"), 2500);
+    }
 
     async function studentLogin() {
       const email = document.getElementById("email").value.trim();
       const password = document.getElementById("password").value.trim();
-      const errorDiv = document.getElementById("errorMsg");
-
+      const err = document.getElementById("errorMsg");
+      err.style.display = "none";
       if (!email || !password) {
-        errorDiv.textContent = "Please enter email and password";
-        errorDiv.style.display = "block";
+        err.textContent = " Please enter email and password";
+        err.style.display = "block";
         return;
       }
-
       try {
         const res = await fetch("/student-login", {
           method: "POST",
@@ -76,20 +79,16 @@
           body: JSON.stringify({ email, password })
         });
         const data = await res.json();
-
-        if (data.success) {
-          window.location.href = "/student-dashboard";
-        } else {
-          errorDiv.textContent = data.message || "Invalid credentials";
-          errorDiv.style.display = "block";
+        if (data.success) window.location.href = "/student-dashboard";
+        else {
+          err.textContent = " " + (data.message || "Invalid credentials");
+          err.style.display = "block";
         }
-      } catch (err) {
-        errorDiv.textContent = "Connection error. Please try again.";
-        errorDiv.style.display = "block";
+      } catch (e) {
+        err.textContent = " Connection error. Please try again.";
+        err.style.display = "block";
       }
     }
   </script>
-
-<script src="/dark-mode.js"></script>
 </body>
 </html>

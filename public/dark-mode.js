@@ -8,6 +8,7 @@
   // Create toggle button
   var btn = document.createElement('button');
   btn.className = 'dark-mode-toggle';
+  if (document.body.classList.contains('student-portal')) btn.classList.add('no-magnetic');
   btn.title = 'Toggle Dark Mode';
   btn.innerHTML = document.body.classList.contains('dark') ? '☀️' : '🌙';
   btn.onclick = function() {
