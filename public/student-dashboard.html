@@ -64,6 +64,7 @@
   <script src="/identity-strip.js"></script>
   <script src="/student-cursor.js"></script>
   <script src="/magnetic-buttons.js"></script>
+  <script src="/student-effects.js"></script>
   <script src="/club-branding.js"></script>
   <script src="/dark-mode.js"></script>
   <script>
@@ -108,7 +109,7 @@
           bEl.innerHTML = '<p class="sp-sub" style="margin:0;">// no active borrows</p>';
         } else {
           bEl.innerHTML = data.borrows.map(b => `
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; padding:12px 0; border-bottom:1px solid var(--border);">
+            <div class="sp-pulse-green" style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; padding:12px 16px; border-bottom:1px solid var(--border); margin-left:-16px; margin-right:-16px;">
               <div>
                 <span style="font-family:Barlow,sans-serif; font-weight:600; font-size:13px;">${b.component_name}</span>
                 <span class="sp-badge sp-badge--green">IN USE</span>

@@ -95,6 +95,7 @@
   <script src="/identity-strip.js"></script>
   <script src="/student-cursor.js"></script>
   <script src="/magnetic-buttons.js"></script>
+  <script src="/student-effects.js"></script>
   <script src="/club-branding.js"></script>
   <script src="/dark-mode.js"></script>
   <script>
@@ -130,19 +131,6 @@
           el.appendChild(cell);
         }
       }
-    }
-    function countUp(el, target, delay) {
-      const t = Math.floor(Number(target) || 0);
-      const steps = 40;
-      let cur = 0;
-      const inc = Math.max(1, Math.ceil(t / steps));
-      function tick() {
-        cur = Math.min(cur + inc, t);
-        el.textContent = cur;
-        if (cur < t) setTimeout(tick, 24);
-        else el.textContent = t;
-      }
-      setTimeout(tick, delay);
     }
     async function loadProfile() {
       let student;
@@ -193,8 +181,11 @@
       }
       const st = summary.stats;
       [st.totalBorrowed, st.totalReturned, st.activeHolds, st.requestsMade].forEach((v, i) => {
-        countUp(document.getElementById("s" + i), v, i * 120);
+        const el = document.getElementById("s" + i);
+        if (el) el.textContent = v;
       });
+      // Re-trigger counter animation from student-effects.js
+      if (window.initStudentInteractivity) window.initStudentInteractivity();
 
       const hp = document.getElementById("holdsPanel");
       if (!summary.activeHoldRows || summary.activeHoldRows.length === 0) {

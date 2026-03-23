@@ -1075,3 +1075,79 @@ body.student-portal .dark-mode-toggle {
     stroke-dashoffset: 0;
   }
 }
+
+/* Interactivity & Reveal Effects */
+.sp-reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  animation: sp-fade-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: var(--delay, 0s);
+}
+
+@keyframes sp-fade-up {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Glitch Title Effect */
+.sp-title:hover {
+  animation: sp-glitch 0.2s linear infinite;
+  text-shadow: 2px 0 #ff00c1, -2px 0 #00fff9;
+}
+
+@keyframes sp-glitch {
+  0% { transform: translate(0); }
+  20% { transform: translate(-1px, 1px); }
+  40% { transform: translate(-1px, -1px); }
+  60% { transform: translate(1px, 1px); }
+  80% { transform: translate(1px, -1px); }
+  100% { transform: translate(0); }
+}
+
+/* Pulse for Active Borrows */
+.sp-pulse-green {
+  position: relative;
+}
+.sp-pulse-green::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--status-green);
+  box-shadow: 0 0 10px var(--status-green);
+  animation: sp-pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes sp-pulse-glow {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.8; }
+}
+
+/* 3D Tilt for Cards (Applied via JS) */
+.sp-tilt {
+  transform-style: preserve-3d;
+  perspective: 1000px;
+  transition: transform 0.2s ease-out;
+}
+
+/* Counter Animation Helper */
+.sp-stat-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Typing Subtitle Cursor */
+.sp-typing::after {
+  content: "|";
+  animation: sp-blink 0.7s infinite;
+  margin-left: 2px;
+  color: var(--white);
+}
+
+@keyframes sp-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}

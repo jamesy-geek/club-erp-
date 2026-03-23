@@ -11,3 +11,10 @@ firestore.indexes.json
 firebase-debug.log
 .firebase/
 .firebaserc
+
+# Local Databases
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+backups/

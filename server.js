@@ -284,8 +284,10 @@ function requireStudent(req, res, next) {
   }
 
   const hashed = await bcrypt.hash("admin123", 10);
+  // Case-insensitive delete to prevent duplicate admin rows (e.g. "Admin" vs "admin")
+  await db.execute({ sql: "DELETE FROM admins WHERE LOWER(username) = LOWER(?)", args: ["admin"] });
   await db.execute({
-    sql: "INSERT INTO admins (username, password) VALUES (?, ?) ON CONFLICT(username) DO UPDATE SET password = excluded.password",
+    sql: "INSERT INTO admins (username, password) VALUES (?, ?)",
     args: ["admin", hashed]
   });
   console.log("Default admin updated/created → admin / admin123");
