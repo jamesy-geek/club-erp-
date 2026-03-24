@@ -161,14 +161,23 @@ function requireAdmin(req, res, next) {
 const STUDENT_HTML_PATHS = ["/student-dashboard", "/student-catalog", "/student-requests-page", "/student-my-profile"];
 
 function requireStudent(req, res, next) {
+  const sessId = req.session ? req.session.student_id : 'NO_SESSION';
+  const role = req.session ? req.session.role : 'NO_ROLE';
+  
   if (req.session && req.session.student_id) {
     next();
   } else if (req.method === "GET" && STUDENT_HTML_PATHS.includes(req.path)) {
+    console.log(`[AUTH] Redirecting Student Access: ${req.path} | Method: ${req.method} | SID: ${sessId} | Role: ${role}`);
     res.redirect(302, "/student-login.html");
   } else {
+    if (!STUDENT_HTML_PATHS.includes(req.path) && req.path.startsWith("/api/student")) {
+       console.log(`[AUTH] Unauthorized API Access: ${req.path} | Method: ${req.method} | SID: ${sessId}`);
+    }
     return res.status(401).json({ message: "Unauthorized" });
   }
 }
+
+
 
 // ================= DATABASE SETUP =================
 
@@ -1308,22 +1317,30 @@ app.get("/download-report-excel", requireAdmin, async (req, res) => {
 app.post("/student-login", loginRateLimiter, async (req, res) => {
   const { email, password } = req.body;
   try {
+    console.log(`Student login attempt for email: "${email}"`);
     const result = await db.execute({ sql: "SELECT * FROM students WHERE LOWER(email) = LOWER(?)", args: [email] });
     if (result.rows.length === 0) {
+      console.warn(`Student login failed: Email "${email}" not found.`);
       return res.json({ success: false, message: "Email not found" });
     }
     const student = result.rows[0];
     if (!student.password) {
+      console.warn(`Student login failed: Password not set for "${email}".`);
       return res.json({ success: false, message: "Account not configured. Contact admin." });
     }
     const match = await bcrypt.compare(password, student.password);
     if (!match) {
+      console.warn(`Student login failed: Incorrect password for "${email}".`);
       return res.json({ success: false, message: "Incorrect password" });
     }
     req.session.student_id = student.id;
     req.session.role = "student";
     req.session.save((err) => {
-      if (err) return res.status(500).json({ success: false, message: "Session error" });
+      if (err) {
+        console.error(`Session save error for student "${email}":`, err);
+        return res.status(500).json({ success: false, message: "Session error" });
+      }
+      console.log(`Student login successful: "${email}" | Session ID: ${req.sessionID}`);
       res.json({ success: true });
     });
   } catch (err) {
@@ -1331,6 +1348,7 @@ app.post("/student-login", loginRateLimiter, async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
 
 app.post("/student-logout", (req, res) => {
   req.session.destroy(() => res.json({ success: true }));

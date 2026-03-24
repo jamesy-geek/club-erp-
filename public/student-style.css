@@ -27,6 +27,10 @@ html {
   scroll-behavior: smooth;
 }
 
+body.student-portal, body.student-portal *, body.student-portal a, body.student-portal button {
+  cursor: none !important; /* Hide default browser cursor everywhere in student portal */
+}
+
 body.student-portal {
   margin: 0;
   min-height: 100vh;
@@ -38,6 +42,8 @@ body.student-portal {
   position: relative;
   overflow-x: hidden;
 }
+
+
 
 body.student-portal::before {
   content: "";

@@ -4,6 +4,11 @@
   cur.id = "student-cursor";
   cur.setAttribute("aria-hidden", "true");
   document.body.appendChild(cur);
+  
+  // Hide default cursor
+  document.body.style.cursor = 'none';
+  document.documentElement.style.cursor = 'none';
+
   let cx = 0, cy = 0, tx = 0, ty = 0, expanded = false;
   document.addEventListener("mousemove", (e) => {
     tx = e.clientX;
