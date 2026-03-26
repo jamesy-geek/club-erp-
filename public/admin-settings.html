@@ -26,6 +26,8 @@
       <a href="/students-page" id="nav-students">Students</a>
       <a href="/student_profile.html" id="nav-profile">Student Profile</a>
       <a href="/admin-requests-page" id="nav-requests">Request Queue</a>
+      <a href="/admin-request-history.html" id="nav-logs">Request Logs</a>
+      <a href="/admin-damage-log.html" id="nav-damage">Damage Log</a>
 
       <hr>
 
@@ -152,6 +154,31 @@
       <div class="card" style="max-width:400px;">
         <h3>Existing Admins</h3>
         <div id="adminList"></div>
+      </div>
+
+      <!-- Edit Admin Modal -->
+      <div id="editAdminModal" class="modal-overlay">
+        <div class="modal-box">
+          <h2>Edit Admin</h2>
+          <input type="hidden" id="editAdminId">
+          
+          <label>Username</label>
+          <input id="editAdminUser" placeholder="Username">
+          
+          <label>New Password (leave blank to keep current)</label>
+          <input id="editAdminPass" type="password" placeholder="New Password">
+          
+          <label>Role</label>
+          <select id="editAdminRole" style="width: 100%; border:1px solid #e2e8f0; border-radius: 6px; padding: 8px;">
+            <option value="ADMIN">Full Admin (All Access)</option>
+            <option value="SUB_ADMIN">Sub-Admin (Restricted)</option>
+          </select>
+          
+          <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeEditAdminModal()">Cancel</button>
+            <button onclick="saveAdminUpdate()">Save Changes</button>
+          </div>
+        </div>
       </div>
 
       <!-- Create Student Account -->
@@ -318,6 +345,7 @@
       if (!res.ok) return;
 
       const admins = await res.json();
+      allAdmins = admins; // Store globally for editing lookup
 
       const container = document.getElementById("adminList");
       container.innerHTML = "";
@@ -326,10 +354,54 @@
         container.innerHTML += `
       <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; background:#f8fafc; border-radius:8px; margin-bottom:8px;">
         <span><strong>${a.username}</strong> <span class="badge badge-blue" style="margin-left:6px;">${a.role}</span></span>
-        <button class="btn-delete" onclick="deleteAdmin('${a.id}')" title="Delete">🗑️</button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-edit btn-sm" onclick='openEditAdminModal(${JSON.stringify(a).replace(/'/g, "&#39;")})' title="Edit">✏️</button>
+          <button class="btn-delete" onclick="deleteAdmin('${a.id}')" title="Delete">🗑️</button>
+        </div>
       </div>
     `;
       });
+    }
+
+    let allAdmins = [];
+
+    function openEditAdminModal(admin) {
+      document.getElementById("editAdminId").value = admin.id;
+      document.getElementById("editAdminUser").value = admin.username;
+      document.getElementById("editAdminPass").value = "";
+      document.getElementById("editAdminRole").value = admin.role;
+      document.getElementById("editAdminModal").classList.add("active");
+    }
+
+    function closeEditAdminModal() {
+      document.getElementById("editAdminModal").classList.remove("active");
+    }
+
+    async function saveAdminUpdate() {
+      const id = document.getElementById("editAdminId").value;
+      const username = document.getElementById("editAdminUser").value.trim();
+      const password = document.getElementById("editAdminPass").value.trim();
+      const role = document.getElementById("editAdminRole").value;
+
+      if (!username) { showToast("Username is required", false); return; }
+
+      const payload = { id, newUsername: username, role };
+      if (password) payload.newPassword = password;
+
+      const res = await fetch("/update-admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        showToast("Admin updated");
+        closeEditAdminModal();
+        loadAdmins();
+      } else {
+        showToast(data.message, false);
+      }
     }
 
     async function createAdmin() {

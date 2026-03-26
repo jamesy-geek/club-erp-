@@ -255,8 +255,9 @@ function requireStudent(req, res, next) {
 
   const admin_check = await db.execute({ sql: "SELECT * FROM admins WHERE username = ?", args: ["admin"] });
   if (admin_check.rows.length === 0) {
-    const hp = await bcrypt.hash("123", 10);
+    const hp = await bcrypt.hash("admin123", 10);
     await db.execute({ sql: "INSERT INTO admins (username, password, role) VALUES (?, ?, ?)", args: ["admin", hp, "ADMIN"] });
+    console.log("Default admin created: admin / admin123");
   }
 
   const debug_check = await db.execute({ sql: "SELECT * FROM admins WHERE username = ?", args: ["debug_admin"] });
@@ -385,14 +386,7 @@ function requireStudent(req, res, next) {
     });
   }
 
-  const hashed = await bcrypt.hash("admin123", 10);
-  // Case-insensitive delete to prevent duplicate admin rows (e.g. "Admin" vs "admin")
-  await db.execute({ sql: "DELETE FROM admins WHERE LOWER(username) = LOWER(?)", args: ["admin"] });
-  await db.execute({
-    sql: "INSERT INTO admins (username, password, role) VALUES (?, ?, 'ADMIN')",
-    args: ["admin", hashed]
-  });
-  console.log("Default admin updated/created → admin / admin123");
+  // Cleanup redundant admin re-creation (already handled above)
 }
 
 // ================= SETTINGS HELPER =================
@@ -580,7 +574,12 @@ app.post("/change-admin", requireAdmin, async (req, res) => {
     await db.execute({ sql: "UPDATE admins SET username = ?, password = ? WHERE id = ?", args: [newUsername, hashed, req.session.admin] });
     res.json({ success: true });
   } catch (err) {
-    res.json({ success: false, message: "Username already taken" });
+    console.error("Change admin error:", err);
+    if (err.message && err.message.includes("UNIQUE")) {
+      res.json({ success: false, message: "Username already taken" });
+    } else {
+      res.json({ success: false, message: "Server error: " + err.message });
+    }
   }
 });
 
@@ -647,6 +646,30 @@ app.get("/api/admin/request-cart/:cart_id", requireAccess, async (req, res) => {
   }
 
   res.json({ items: items.rows, student_info });
+});
+
+app.get("/api/admin/request-history", requireAccess, async (req, res) => {
+  try {
+    const result = await db.execute(`
+      SELECT 
+        cr.*,
+        s.student_name,
+        s.usn,
+        c.name as component_name,
+        a.username as admin_name
+      FROM component_requests cr
+      JOIN students s ON cr.student_id = s.id
+      JOIN components c ON cr.component_id = c.id
+      LEFT JOIN admins a ON cr.admin_id = a.id
+      WHERE cr.status != 'PENDING'
+      ORDER BY cr.updated_at DESC
+      LIMIT 100
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Request history error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
 });
 
 app.post("/api/admin/requests/bulk-action", requireAccess, async (req, res) => {
@@ -728,15 +751,56 @@ app.post("/api/admin/requests/bulk-action", requireAccess, async (req, res) => {
 app.post("/create-admin", requireAdmin, async (req, res) => {
   const { newUsername, newPassword, role } = req.body;
   if (!newUsername || !newPassword) return res.json({ success: false, message: "Missing fields" });
+  console.log(`[ADMIN] Creating new admin: ${newUsername} with role ${role}`);
   try {
     const hashed = await bcrypt.hash(newPassword, 10);
     await db.execute({ 
       sql: "INSERT INTO admins (username, password, role) VALUES (?, ?, ?)", 
       args: [newUsername, hashed, role || 'SUB_ADMIN'] 
     });
+    console.log(`[ADMIN] Successfully created admin: ${newUsername}`);
     res.json({ success: true });
   } catch (err) {
-    res.json({ success: false, message: "Username already taken" });
+    console.error(`[ADMIN] Failed to create admin: ${newUsername}`, err);
+    res.json({ success: false, message: "Username already taken or database error" });
+  }
+});
+
+app.post("/update-admin", requireAdmin, async (req, res) => {
+  const { id, newUsername, newPassword, role } = req.body;
+  if (!id) return res.json({ success: false, message: "Admin ID required" });
+  console.log(`[ADMIN] Updating admin ID: ${id}`);
+  
+  try {
+    let sql = "UPDATE admins SET ";
+    const args = [];
+    const updates = [];
+    
+    if (newUsername) {
+      updates.push("username = ?");
+      args.push(newUsername);
+    }
+    if (newPassword) {
+      const hashed = await bcrypt.hash(newPassword, 10);
+      updates.push("password = ?");
+      args.push(hashed);
+    }
+    if (role) {
+      updates.push("role = ?");
+      args.push(role);
+    }
+    
+    if (updates.length === 0) return res.json({ success: false, message: "No updates provided" });
+    
+    sql += updates.join(", ") + " WHERE id = ?";
+    args.push(id);
+    
+    await db.execute({ sql, args });
+    console.log(`[ADMIN] Successfully updated admin ID: ${id}`);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(`[ADMIN] Failed to update admin ID: ${id}`, err);
+    res.json({ success: false, message: "Update failed: " + err.message });
   }
 });
 
@@ -747,11 +811,18 @@ app.get("/admins", requireAdmin, async (req, res) => {
 
 app.post("/delete-admin", requireAdmin, async (req, res) => {
   const { id } = req.body;
+  console.log(`[ADMIN] Deletion attempt for Admin ID: ${id} by Session Admin: ${req.session.admin}`);
   if (id === req.session.admin) return res.json({ success: false, message: "Cannot delete yourself" });
-  const count = await db.execute("SELECT COUNT(*) as count FROM admins");
-  if (count.rows[0].count <= 1) return res.json({ success: false, message: "Cannot delete the last admin" });
-  await db.execute({ sql: "DELETE FROM admins WHERE id = ?", args: [id] });
-  res.json({ success: true });
+  try {
+    const count = await db.execute("SELECT COUNT(*) as count FROM admins");
+    if (count.rows[0].count <= 1) return res.json({ success: false, message: "Cannot delete the last admin" });
+    await db.execute({ sql: "DELETE FROM admins WHERE id = ?", args: [id] });
+    console.log(`[ADMIN] Successfully deleted Admin ID: ${id}`);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(`[ADMIN] Failed to delete Admin ID: ${id}`, err);
+    res.json({ success: false, message: "Deletion failed: " + err.message });
+  }
 });
 
 // ================= PAGE ROUTES =================
@@ -960,6 +1031,7 @@ app.put("/api/admin/settings", requireAccess, async (req, res) => {
 
 app.post("/return-item", requireAccess, async (req, res) => {
   const { item_id, return_quantity, component_id, is_damaged, damage_severity, damage_note } = req.body;
+  console.log(`[RETURN] Request received: ItemID=${item_id}, Qty=${return_quantity}, Dmg=${is_damaged}`);
   const itemIdInt = parseInt(item_id);
   const compIdInt = parseInt(component_id);
   const qtyInt = parseInt(return_quantity);
@@ -1492,7 +1564,7 @@ app.post("/import-components", requireAdmin, upload.single("file"), async (req, 
 // PDFDocument is already required at the top
 
 
-app.get("/download-report-pdf", requireAdmin, async (req, res) => {
+app.get("/download-report-pdf", requireAccess, async (req, res) => {
   const { usn, startDate, endDate } = req.query;
 
   let query = `
@@ -1595,7 +1667,7 @@ app.get("/download-report-pdf", requireAdmin, async (req, res) => {
 // ExcelJS is already required at the top
 
 
-app.get("/download-report-excel", requireAdmin, async (req, res) => {
+app.get("/download-report-excel", requireAccess, async (req, res) => {
   const { usn, startDate, endDate } = req.query;
 
   let query = `

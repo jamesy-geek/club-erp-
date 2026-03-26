@@ -29,6 +29,8 @@
       <a href="/students-page" id="nav-students">Students</a>
       <a href="/student_profile.html" id="nav-profile">Student Profile</a>
       <a href="/admin-requests-page" id="nav-requests">Request Queue</a>
+      <a href="/admin-request-history.html" id="nav-logs">Request Logs</a>
+      <a href="/admin-damage-log.html" id="nav-damage">Damage Log</a>
 
       <hr>
 
@@ -220,14 +222,14 @@
 
         if (!qty || qty <= 0) { showToast("Invalid quantity", false); return; }
 
-        await returnItem(pendingDamage.item_id, pendingDamage.component_id, true, severity, note, qty);
+        await returnItem(pendingDamage.item_id, pendingDamage.component_id, true, severity, note, qty, true);
         closeDamageModal();
       }
 
       // ================= INDIVIDUAL RETURN =================
 
-      async function returnItem(item_id, component_id, is_damaged = false, severity = 'MINOR', note = '', customQty = null) {
-        console.log("returnItem called:", { item_id, component_id, is_damaged });
+      async function returnItem(item_id, component_id, is_damaged = false, severity = 'MINOR', note = '', customQty = null, skipConfirm = false) {
+        console.log("returnItem called:", { item_id, component_id, is_damaged, skipConfirm });
         let qty;
         if (customQty !== null) {
           qty = customQty;
@@ -241,7 +243,7 @@
           return;
         }
 
-        if (!confirm(`Confirm return of ${qty} item(s)?${is_damaged ? ' (Marked as DAMAGED)' : ''}`)) return;
+        if (!skipConfirm && !confirm(`Confirm return of ${qty} item(s)?${is_damaged ? ' (Marked as DAMAGED)' : ''}`)) return;
 
         try {
           const res = await fetch("/return-item", {
