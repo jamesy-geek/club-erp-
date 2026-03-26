@@ -139,32 +139,55 @@
         el.innerHTML = '<div class="sp-card"><p class="sp-sub">// no requests found</p></div>';
         return;
       }
-      el.innerHTML = filtered.map(r => {
-        const canEdit = r.status === "PENDING" || r.status === "DRAFT";
-        const esc = (s) => {
-          const d = document.createElement("div");
-          d.textContent = s ?? "";
-          return d.innerHTML;
-        };
-        return `
-          <div class="sp-card" style="border-left:2px solid ${leftBorder(r.status)}; margin-bottom:12px;">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
-              <div>
-                <span style="font-family:Barlow,sans-serif; font-weight:600; font-size:14px;">${esc(r.component_name)}</span>
-                <span class="${badgeClass(r.status)}">${r.status}</span>
-              </div>
-              <span style="font-family:'JetBrains Mono',monospace; font-size:8px; color:var(--dim);">${new Date(r.created_at).toLocaleString()}</span>
-            </div>
-            ${r.purpose_note ? `<div style="font-family:'JetBrains Mono',monospace; font-size:8px; color:var(--dim); margin-top:8px;">// ${esc(r.purpose_note)}</div>` : ""}
-            ${r.rejection_reason ? `<div style="font-family:'JetBrains Mono',monospace; font-size:8px; color:rgba(248,113,113,0.6); margin-top:6px;">reason: ${esc(r.rejection_reason)}</div>` : ""}
-            ${r.confirmed_at ? `<div style="font-family:'JetBrains Mono',monospace; font-size:8px; color:rgba(255,255,255,0.4); margin-top:6px;">confirmed: ${new Date(r.confirmed_at).toLocaleString()}</div>` : ""}
-            ${canEdit ? `
-              <div style="margin-top:12px; display:flex; gap:8px;">
-                <button type="button" class="sp-btn sp-btn--secondary sp-btn--sm sp-interactive" onclick="openEditModal(${r.id})">[ Edit ]</button>
-                <button type="button" class="sp-btn sp-btn--danger sp-btn--sm sp-interactive" onclick="withdrawRequest(${r.id})">[ Withdraw ]</button>
-              </div>` : ""}
+      
+      const grouped = {};
+      filtered.forEach(r => {
+        const key = r.cart_id || ('SINGLE-' + r.id);
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(r);
+      });
+
+      const esc = (s) => {
+        const d = document.createElement("div");
+        d.textContent = s ?? "";
+        return d.innerHTML;
+      };
+
+      let html = '';
+      Object.keys(grouped).forEach(cartKey => {
+        const items = grouped[cartKey];
+        const first = items[0];
+        
+        html += `<div class="sp-card" style="margin-bottom:16px; border:1px solid rgba(255,255,255,0.05); padding:16px;">
+          <div style="margin-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:8px; display:flex; justify-content:space-between;">
+            <span style="font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--dim);">CART // ${cartKey}</span>
+            <span style="font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--dim);">${new Date(first.created_at).toLocaleString()}</span>
           </div>`;
-      }).join("");
+        
+        items.forEach(r => {
+          const canEdit = r.status === "PENDING" || r.status === "DRAFT";
+          html += `
+            <div style="border-left:2px solid ${leftBorder(r.status)}; margin-bottom:12px; padding-left:12px;">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
+                <div>
+                  <span style="font-family:Barlow,sans-serif; font-weight:600; font-size:14px;">${esc(r.component_name)} (x${r.quantity})</span>
+                  <span class="${badgeClass(r.status)}">${r.status}</span>
+                </div>
+              </div>
+              ${r.purpose_note ? `<div style="font-family:'JetBrains Mono',monospace; font-size:8px; color:var(--dim); margin-top:8px;">// ${esc(r.purpose_note)}</div>` : ""}
+              ${r.rejection_reason ? `<div style="font-family:'JetBrains Mono',monospace; font-size:8px; color:rgba(248,113,113,0.6); margin-top:6px;">reason: ${esc(r.rejection_reason)}</div>` : ""}
+              ${r.confirmed_at ? `<div style="font-family:'JetBrains Mono',monospace; font-size:8px; color:rgba(255,255,255,0.4); margin-top:6px;">confirmed: ${new Date(r.confirmed_at).toLocaleString()}</div>` : ""}
+              ${canEdit ? `
+                <div style="margin-top:12px; display:flex; gap:8px;">
+                  <button type="button" class="sp-btn sp-btn--secondary sp-btn--sm sp-interactive" onclick="openEditModal(${r.id})">[ Edit ]</button>
+                  <button type="button" class="sp-btn sp-btn--danger sp-btn--sm sp-interactive" onclick="withdrawRequest(${r.id})">[ Withdraw ]</button>
+                </div>` : ""}
+            </div>`;
+        });
+        
+        html += `</div>`;
+      });
+      el.innerHTML = html;
       window.initStudentMagnetic();
     }
 

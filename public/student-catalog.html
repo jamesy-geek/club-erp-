@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <title>Component Catalog — CERP</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="/student-style.css">
+  <link rel="stylesheet" href="/student-style.css?v=1.0.2">
 </head>
 <body class="student-portal">
 
@@ -102,7 +102,9 @@
       try {
         const res = await fetch("/api/student/catalog", { credentials: "same-origin" });
         if (res.status === 401) { window.location.href = "/student-login.html"; return; }
-        allComponents = await res.json();
+        const data = await res.json();
+        // Standardize all IDs as Strings to prevent type mismatch (BigInt, UUID, integer)
+        allComponents = data.map(c => ({ ...c, id: String(c.id) }));
         renderCatalog(allComponents);
       } catch (e) { console.error(e); }
     }
@@ -126,25 +128,27 @@
       }
       grid.innerHTML = components.map(c => {
         const inStock = c.available_quantity > 0;
-        const ci = cart.find(x => x.component_id === c.id);
+        const ci = cart.find(x => String(x.component_id) === String(c.id));
         const inCart = !!ci;
         const img = c.photo1
           ? `<img class="sp-cat-img" src="${escapeAttr(c.photo1)}" alt="">`
           : `<div class="sp-cat-img-ph">// NO IMG</div>`;
+        
         let actions = "";
         if (!inStock) {
           actions = `<button type="button" class="sp-btn sp-btn--secondary sp-btn--block" disabled style="opacity:0.5; cursor:not-allowed; margin-top:12px; border-color:rgba(255,255,255,0.05); color:var(--dim);">[ Out of Stock ]</button>`;
         } else if (!inCart) {
-          actions = `<button type="button" class="sp-btn sp-btn--primary sp-btn--block sp-interactive" style="margin-top:12px;" onclick="addToCart(${c.id})">[ Add to Cart ]</button>`;
+          actions = `<button type="button" class="sp-btn sp-btn--primary sp-btn--block sp-interactive sp-add-btn" style="margin-top:12px;" data-id="${c.id}">[ Add to Cart ]</button>`;
         } else {
           actions = `
             <div style="display:flex; align-items:center; gap:8px; margin-top:12px;">
-              <button type="button" class="sp-btn sp-btn--secondary sp-interactive" onclick="updateCartQty(${c.id},-1)">−</button>
+              <button type="button" class="sp-btn sp-btn--secondary sp-interactive sp-qty-btn" data-id="${c.id}" data-delta="-1">−</button>
               <span style="font-family:'Bebas Neue',sans-serif; font-size:22px; flex:1; text-align:center;">${ci.quantity}</span>
-              <button type="button" class="sp-btn sp-btn--secondary sp-interactive" onclick="updateCartQty(${c.id},1)">+</button>
+              <button type="button" class="sp-btn sp-btn--secondary sp-interactive sp-qty-btn" data-id="${c.id}" data-delta="1">+</button>
             </div>
-            <button type="button" class="sp-btn sp-btn--danger sp-btn--block sp-interactive" style="margin-top:8px;" onclick="removeFromCart(${c.id})">[ Remove ]</button>`;
+            <button type="button" class="sp-btn sp-btn--danger sp-btn--block sp-interactive sp-remove-btn" style="margin-top:8px;" data-id="${c.id}">[ Remove ]</button>`;
         }
+        
         return `
           <div class="sp-cat-card sp-card">
             ${img}
@@ -170,28 +174,32 @@
       return String(t).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
     }
 
-    function addToCart(component_id) {
-      const c = allComponents.find(x => x.id === component_id);
-      if (!c) return;
-      cart.push({ component_id, component_name: c.name, quantity: 1, available_quantity: c.available_quantity });
+    function addToCart(compId) {
+      const id = String(compId);
+      console.log('Adding to cart ID:', id);
+      const c = allComponents.find(x => String(x.id) === id);
+      if (!c) { console.error('Component not found for ID:', id); return; }
+      cart.push({ component_id: id, component_name: c.name, quantity: 1, available_quantity: Number(c.available_quantity) });
       updateUI();
       renderCatalog(allComponents);
       const fab = document.getElementById("cartFAB");
       fab.style.transform = "scale(1.12)";
       setTimeout(() => { fab.style.transform = ""; }, 200);
     }
-    function removeFromCart(component_id) {
-      cart = cart.filter(i => i.component_id !== component_id);
+    function removeFromCart(compId) {
+      const id = String(compId);
+      cart = cart.filter(i => String(i.component_id) !== id);
       updateUI();
       renderCatalog(allComponents);
     }
-    function updateCartQty(component_id, delta) {
-      const item = cart.find(i => i.component_id === component_id);
+    function updateCartQty(compId, delta) {
+      const id = String(compId);
+      const item = cart.find(i => String(i.component_id) === id);
       if (!item) return;
       const nq = item.quantity + delta;
       if (nq > item.available_quantity) { showToast("Only " + item.available_quantity + " available", false); return; }
       if (nq > 5) { showToast("Max limit is 5 per item", false); return; }
-      if (nq <= 0) removeFromCart(component_id);
+      if (nq <= 0) removeFromCart(id);
       else { item.quantity = nq; updateUI(); renderCatalog(allComponents); }
     }
 
@@ -222,12 +230,12 @@
               <div style="font-family:Barlow,sans-serif; font-weight:600; font-size:13px;">${escapeHtml(item.component_name)}</div>
               <div style="font-family:'JetBrains Mono',monospace; font-size:8px; color:var(--dim);">// stock: ${item.available_quantity}</div>
             </div>
-            <button type="button" class="sp-btn sp-btn--secondary sp-btn--sm no-magnetic" onclick="removeFromCart(${item.component_id})">×</button>
+            <button type="button" class="sp-btn sp-btn--secondary sp-btn--sm no-magnetic sp-remove-btn" data-id="${item.component_id}">×</button>
           </div>
           <div style="display:flex; align-items:center; gap:12px; margin-top:12px;">
-            <button type="button" class="sp-btn sp-btn--secondary sp-interactive" onclick="updateCartQty(${item.component_id},-1)">−</button>
+            <button type="button" class="sp-btn sp-btn--secondary sp-interactive sp-qty-btn" data-id="${item.component_id}" data-delta="-1">−</button>
             <span style="font-family:'Bebas Neue',sans-serif; font-size:22px;">${item.quantity}</span>
-            <button type="button" class="sp-btn sp-btn--secondary sp-interactive" onclick="updateCartQty(${item.component_id},1)">+</button>
+            <button type="button" class="sp-btn sp-btn--secondary sp-interactive sp-qty-btn" data-id="${item.component_id}" data-delta="1">+</button>
           </div>
         </div>`).join("");
       window.initStudentMagnetic();
@@ -263,7 +271,21 @@
       btn.disabled = cart.length === 0;
     }
 
-    window.onload = loadCatalog;
+    document.addEventListener("click", (e) => {
+      const target = e.target.closest('button');
+      if (!target || !target.dataset.id) return;
+      
+      const id = target.dataset.id;
+      if (target.classList.contains('sp-add-btn')) {
+        addToCart(id);
+      } else if (target.classList.contains('sp-remove-btn')) {
+        removeFromCart(id);
+      } else if (target.classList.contains('sp-qty-btn')) {
+        updateCartQty(id, parseInt(target.dataset.delta));
+      }
+    });
+
+    loadCatalog();
   </script>
 </body>
 </html>

@@ -1,11 +1,8 @@
 (function () {
   // --- Staggered Reveals ---
   function applyReveals() {
-    const reveals = document.querySelectorAll('.sp-card, .sp-title, .sp-sub, .sp-btn, .sp-cat-card');
-    reveals.forEach((el, index) => {
-      el.classList.add('sp-reveal');
-      el.style.setProperty('--delay', `${index * 0.08}s`);
-    });
+    // Disabled to prevent elements from staying hidden due to animation delays
+    return;
   }
 
   // --- Typing Effect ---
@@ -26,24 +23,8 @@
 
   // --- 3D Tilt Effect ---
   function applyTilt(el) {
-    if (el.dataset.tiltBound) return;
-    el.dataset.tiltBound = "1";
-    el.classList.add('sp-tilt');
-    
-    el.addEventListener('mousemove', (e) => {
-      const rect = el.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const centerX = rect.width / 2;
-      const centerY = rect.height / 2;
-      const angleX = (y - centerY) / 8;
-      const angleY = (centerX - x) / 8;
-      el.style.transform = `rotateX(${angleX}deg) rotateY(${angleY}deg) scale(1.02)`;
-    });
-
-    el.addEventListener('mouseleave', () => {
-      el.style.transform = `rotateX(0deg) rotateY(0deg) scale(1)`;
-    });
+    // Disabled to solve click registration issues at different angles
+    return;
   }
 
   // --- Number Counter ---
@@ -91,14 +72,6 @@
     
     // Auto-bind tilt to catalog cards and stats
     document.querySelectorAll('.sp-cat-card, .sp-stat-cell').forEach(applyTilt);
-    
-    // Custom typing effect for dashboard
-    const sub = document.getElementById('welcomeSub');
-    if (sub && !sub.dataset.typed) {
-      sub.dataset.typed = "1";
-      const fullText = sub.innerText;
-      typeSubtitle(sub, fullText);
-    }
     
     // Animate counters if present
     document.querySelectorAll('.sp-stat-num').forEach(el => {

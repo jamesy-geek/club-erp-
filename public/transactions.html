@@ -64,8 +64,14 @@
       }
 
       async function load() {
-        const res = await fetch("/transactions?t=" + Date.now());
-        const data = await res.json();
+        try {
+          const res = await fetch("/transactions?t=" + Date.now());
+          if (!res.ok) {
+            if (res.status === 401) { window.location.href = "/login.html"; return; }
+            throw new Error(`Server returned ${res.status}`);
+          }
+          const data = await res.json();
+          if (!Array.isArray(data)) throw new Error("Invalid response format");
 
         const container = document.getElementById("container");
         container.innerHTML = "";
@@ -135,41 +141,46 @@
           html += "<ul style='list-style:none;padding:0;'>";
 
           issue.items.forEach(item => {
-
             html += `
         <li style="margin-top:10px; padding:10px; background:#f8fafc; border-radius:8px;">
-          <strong>${item.component_name}</strong><br>
-          <span style="font-size:13px;color:#475569;">
-            Issued: ${item.quantity} &nbsp;|&nbsp;
-            Returned: ${item.returned_quantity} &nbsp;|&nbsp;
-            Remaining: ${item.remaining}
-          </span>
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div>
+              <strong>${item.component_name}</strong><br>
+              <span style="font-size:13px;color:#475569;">
+                Issued: ${item.quantity} &nbsp;|&nbsp;
+                Returned: ${item.returned_quantity} &nbsp;|&nbsp;
+                Remaining: ${item.remaining}
+              </span>
+              ${item.returned_quantity > 0 && item.return_timestamp ? `<br><span style="font-size:12px; color:#64748b;">Returned on: ${new Date(item.return_timestamp).toLocaleString()}</span>` : ''}
+              ${item.damage_severity ? `<div style="margin-top:8px; padding:8px; background:#fef2f2; border-left:3px solid #dc2626; border-radius:4px;"><span style="font-size:12px; color:#b91c1c; font-weight:bold;">⚠️ Damaged (${item.damage_severity})</span><br><span style="font-size:12px; color:#991b1b;">Note: ${item.damage_note}</span><br><span style="font-size:11px; color:#991b1b;">Reported: ${new Date(item.damage_timestamp).toLocaleString()}</span></div>` : ''}
+            </div>
+          </div>
           <br>
       `;
 
             if (item.remaining > 0) {
-
               html += `
-          <div style="margin-top:6px; display:flex; gap:8px; align-items:center;">
+          <div style="margin-top:6px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
             <input
               type="number"
               id="return-${item.item_id}"
-              placeholder="Qty"
+              value="${item.remaining}"
               min="1"
               max="${item.remaining}"
-              style="width:80px;"
+              style="width:70px; padding: 6px; border: 1px solid #e2e8f0; border-radius: 4px;"
             >
-            <button class="btn-sm" onclick="returnItem('${item.item_id}', '${item.component_id}')">
+            <button class="btn-sm" style="background: #2563eb;" onclick="returnItem('${item.item_id}', '${item.component_id}', false)">
               Return
+            </button>
+            <button class="btn-sm" style="background: #dc2626;" onclick="openDamageModal('${item.item_id}', '${item.component_id}', '${item.remaining}')">
+              ⚠️ Return & Report Damage
             </button>
           </div>
         `;
-
             } else {
-
               html += `
           <span style="color:#334155; font-size:12px;">
-            ✔ Returned
+            ✔ Fully Returned
           </span>
         `;
             }
@@ -178,38 +189,87 @@
           });
 
           html += "</ul></div>";
-
           container.innerHTML += html;
         });
+      } catch (err) {
+        console.error("Load failed:", err);
+        container.innerHTML = `<div style="padding:20px; color:#dc2626; background:white; border-radius:8px;">Error loading transactions: ${err.message}</div>`;
+      }
+    }
+
+      // ================= DAMAGE MODAL =================
+
+      let pendingDamage = null;
+
+      function openDamageModal(item_id, component_id, max_qty) {
+        console.log("Opening Damage Modal:", { item_id, component_id, max_qty });
+        pendingDamage = { item_id, component_id, max_qty };
+        document.getElementById("dmgQty").value = max_qty;
+        document.getElementById("dmgQty").max = max_qty;
+        document.getElementById("damageModal").classList.add("active");
       }
 
+      function closeDamageModal() {
+        document.getElementById("damageModal").classList.remove("active");
+      }
+
+      async function submitDamageReturn() {
+        const qty = parseInt(document.getElementById("dmgQty").value);
+        const severity = document.getElementById("dmgSeverity").value;
+        const note = document.getElementById("dmgNote").value.trim();
+
+        if (!qty || qty <= 0) { showToast("Invalid quantity", false); return; }
+
+        await returnItem(pendingDamage.item_id, pendingDamage.component_id, true, severity, note, qty);
+        closeDamageModal();
+      }
 
       // ================= INDIVIDUAL RETURN =================
 
-      async function returnItem(item_id, component_id) {
-
-        const input = document.getElementById(`return-${item_id}`);
-        const qty = parseInt(input.value);
+      async function returnItem(item_id, component_id, is_damaged = false, severity = 'MINOR', note = '', customQty = null) {
+        console.log("returnItem called:", { item_id, component_id, is_damaged });
+        let qty;
+        if (customQty !== null) {
+          qty = customQty;
+        } else {
+          const input = document.getElementById(`return-${item_id}`);
+          qty = parseInt(input.value);
+        }
 
         if (!qty || qty <= 0) {
           showToast("Enter valid return quantity", false);
           return;
         }
 
-        if (!confirm("Confirm return?")) return;
+        if (!confirm(`Confirm return of ${qty} item(s)?${is_damaged ? ' (Marked as DAMAGED)' : ''}`)) return;
 
-        await fetch("/return-item", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            item_id,
-            return_quantity: qty,
-            component_id
-          })
-        });
-
-        showToast("Item returned");
-        load();
+        try {
+          const res = await fetch("/return-item", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({
+              item_id,
+              return_quantity: qty,
+              component_id,
+              is_damaged,
+              damage_severity: severity,
+              damage_note: note
+            })
+          });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            showToast(data.message || "Return processed", true);
+            load();
+          } else {
+            const errMsg = data.message || data.error || "Return failed";
+            showToast(errMsg, false);
+            console.error("Return Error:", data);
+          }
+        } catch (e) { 
+          console.error("Return error:", e);
+          showToast("Network Error: " + e.message, false); 
+        }
       }
 
 
@@ -219,14 +279,23 @@
 
         if (!confirm("Return ALL items for this transaction?")) return;
 
-        await fetch("/return-all", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ issue_id })
-        });
-
-        showToast("All items returned");
-        load();
+        try {
+          const res = await fetch("/return-all", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ issue_id })
+          });
+          const data = await res.json();
+          if (res.ok) {
+            showToast(data.message || "All items returned", true);
+            load();
+          } else {
+            showToast(data.message || "Bulk return failed", false);
+          }
+        } catch (e) {
+          showToast("Error processing request", false);
+        }
       }
 
       // ================= DELETE TRANSACTION =================
@@ -249,12 +318,38 @@
       load();
 
     </script>
-
+    
     <script>
       function toggleMenu() {
         document.getElementById("sidebar").classList.toggle("active");
       }
     </script>
+
+    <!-- Damage Modal -->
+    <div id="damageModal" class="modal-overlay">
+      <div class="modal-box" style="width:400px; padding:25px; background:white; border-radius:12px;">
+        <h2 style="margin-top:0;">Report Damage</h2>
+        <p style="font-size:13px; color:#64748b; margin-bottom:15px;">Specify damage details for the returned item(s).</p>
+        
+        <label>Quantity Damaged</label>
+        <input type="number" id="dmgQty" min="1" style="width:100%; margin-bottom:15px; padding:10px; border:1px solid #e2e8f0; border-radius:6px;">
+        
+        <label>Severity</label>
+        <select id="dmgSeverity" style="width:100%; margin-bottom:15px; padding:10px; border:1px solid #e2e8f0; border-radius:6px;">
+          <option value="MINOR">Minor (Scratches/Cosmetic)</option>
+          <option value="MAJOR">Major (Broken/Non-Functional)</option>
+          <option value="DESTROYED">Destroyed (Beyond Repair)</option>
+        </select>
+        
+        <label>Notes / Reason</label>
+        <textarea id="dmgNote" placeholder="e.g. Pin snapped during use" rows="3" style="width:100%; margin-bottom:20px; padding:10px; border:1px solid #e2e8f0; border-radius:6px; resize:vertical;"></textarea>
+        
+        <div style="display:flex; gap:10px; justify-content:flex-end;">
+          <button class="btn-cancel" onclick="closeDamageModal()">Cancel</button>
+          <button style="background:#dc2626; color:white;" onclick="submitDamageReturn()">Confirm & Report</button>
+        </div>
+      </div>
+    </div>
 
     <div id="toast" style="
   position: fixed;

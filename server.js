@@ -27,6 +27,16 @@ if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) {
 
 const app = express();
 
+// ================= CRASH LOGGING =================
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("UNHANDLED REJECTION:", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("UNCAUGHT EXCEPTION:", err);
+  process.exit(1);
+});
+
+
 // Trust Render's reverse proxy (required for sessions & secure cookies behind HTTPS)
 app.set("trust proxy", 1);
 
@@ -69,7 +79,7 @@ function loginRateLimiter(req, res, next) {
   const ip = req.ip;
   const now = Date.now();
   const windowMs = 15 * 60 * 1000;
-  const maxAttempts = 10;
+  const maxAttempts = 50; // Increased for troubleshooting
   const record = loginAttempts.get(ip);
   if (record) {
     if (now - record.lastAttempt > windowMs) {
@@ -92,30 +102,49 @@ class TursoStore extends session.Store {
     this.db = dbClient;
   }
   async get(sid, callback) {
-    try {
-      const result = await this.db.execute({ sql: "SELECT data FROM sessions WHERE sid = ? AND expires > ?", args: [sid, Date.now()] });
-      if (result.rows.length > 0) {
-        callback(null, JSON.parse(result.rows[0].data));
-      } else {
-        callback(null, null);
+    const maxRetries = 2;
+    let lastErr;
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const result = await this.db.execute({ 
+          sql: "SELECT data FROM sessions WHERE sid = ? AND expires > ?", 
+          args: [sid, Date.now()] 
+        });
+        if (result.rows.length > 0) {
+          return callback(null, JSON.parse(result.rows[0].data));
+        }
+        return callback(null, null);
+      } catch (err) {
+        lastErr = err;
+        console.warn(`[RETRY ${i+1}/${maxRetries}] Session GET error:`, err.message);
+        if (i < maxRetries - 1) await new Promise(r => setTimeout(r, 200 * (i + 1)));
       }
-    } catch (err) {
-      console.error("Session GET error:", err.message);
-      // Return null session instead of propagating error (prevents 500 on every request)
-      callback(null, null);
     }
+    console.error("Session GET failed after retries:", lastErr.message);
+    callback(null, null);
   }
   async set(sid, sessionData, callback) {
-    try {
-      const maxAge = sessionData.cookie && sessionData.cookie.maxAge ? sessionData.cookie.maxAge : 86400000;
-      const expires = Date.now() + maxAge;
-      const data = JSON.stringify(sessionData);
-      await this.db.execute({ sql: "INSERT OR REPLACE INTO sessions (sid, data, expires) VALUES (?, ?, ?)", args: [sid, data, expires] });
-      if (callback) callback(null);
-    } catch (err) {
-      console.error("Session SET error:", err.message);
-      if (callback) callback(null); // Don't propagate — session just won't persist
+    const maxRetries = 2;
+    let lastErr;
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const maxAge = sessionData.cookie && sessionData.cookie.maxAge ? sessionData.cookie.maxAge : 86400000;
+        const expires = Date.now() + maxAge;
+        const data = JSON.stringify(sessionData);
+        await this.db.execute({ 
+          sql: "INSERT OR REPLACE INTO sessions (sid, data, expires) VALUES (?, ?, ?)", 
+          args: [sid, data, expires] 
+        });
+        if (callback) callback(null);
+        return;
+      } catch (err) {
+        lastErr = err;
+        console.warn(`[RETRY ${i+1}/${maxRetries}] Session SET error:`, err.message);
+        if (i < maxRetries - 1) await new Promise(r => setTimeout(r, 200 * (i + 1)));
+      }
     }
+    console.error("Session SET failed after retries:", lastErr.message);
+    if (callback) callback(null);
   }
   async destroy(sid, callback) {
     try {
@@ -158,6 +187,33 @@ function requireAdmin(req, res, next) {
   }
 }
 
+/**
+ * Access levels:
+ * - ADMIN: Full access to everything.
+ * - SUB_ADMIN: Access to Request Queue, Transactions, Reports, Damage Log.
+ */
+const RESTRICTED_FOR_SUB_ADMIN = [
+  "/students-page", "/api/admin/bulk-import-students", "/api/admin/cleanup-graduated",
+  "/components-page", "/add-component", "/edit-component", "/delete-component", "/update-stock",
+  "/admin-settings-page", "/api/admin/settings", "/create-admin", "/delete-admin", "/change-admin", "/admins",
+  "/backup", "/list-backups", "/restore-backup", "/delete-backup"
+];
+
+function requireAccess(req, res, next) {
+  if (!req.session || !req.session.admin) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  
+  const role = req.session.role;
+  const path = req.path;
+  
+  if (role === 'SUB_ADMIN' && RESTRICTED_FOR_SUB_ADMIN.some(p => path.startsWith(p))) {
+    return res.status(403).json({ success: false, message: "Access denied: Full Admin privileges required." });
+  }
+  
+  next();
+}
+
 const STUDENT_HTML_PATHS = ["/student-dashboard", "/student-catalog", "/student-requests-page", "/student-my-profile"];
 
 function requireStudent(req, res, next) {
@@ -191,8 +247,23 @@ function requireStudent(req, res, next) {
   await db.execute(`CREATE TABLE IF NOT EXISTS admins (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE,
-    password TEXT
+    password TEXT,
+    role TEXT NOT NULL DEFAULT 'ADMIN'
   )`);
+  
+  try { await db.execute(`ALTER TABLE admins ADD COLUMN role TEXT NOT NULL DEFAULT 'ADMIN'`); } catch (e) { /* column exists */ }
+
+  const admin_check = await db.execute({ sql: "SELECT * FROM admins WHERE username = ?", args: ["admin"] });
+  if (admin_check.rows.length === 0) {
+    const hp = await bcrypt.hash("123", 10);
+    await db.execute({ sql: "INSERT INTO admins (username, password, role) VALUES (?, ?, ?)", args: ["admin", hp, "ADMIN"] });
+  }
+
+  const debug_check = await db.execute({ sql: "SELECT * FROM admins WHERE username = ?", args: ["debug_admin"] });
+  if (debug_check.rows.length === 0) {
+    const hp = await bcrypt.hash("debug123", 10);
+    await db.execute({ sql: "INSERT INTO admins (username, password, role) VALUES (?, ?, ?)", args: ["debug_admin", hp, "ADMIN"] });
+  }
 
   await db.execute(`CREATE TABLE IF NOT EXISTS components (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -238,9 +309,11 @@ function requireStudent(req, res, next) {
     component_id INTEGER,
     quantity INTEGER,
     returned_quantity INTEGER DEFAULT 0,
+    updated_at DATETIME DEFAULT (datetime('now', '+5 hours', '+30 minutes')),
     FOREIGN KEY(issue_id) REFERENCES issues(id),
     FOREIGN KEY(component_id) REFERENCES components(id)
   )`);
+  try { await db.execute(`ALTER TABLE issue_items ADD COLUMN updated_at DATETIME`); } catch (e) {}
 
   await db.execute(`CREATE TABLE IF NOT EXISTS component_requests (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -259,9 +332,29 @@ function requireStudent(req, res, next) {
     edit_log TEXT DEFAULT '[]',
     created_at DATETIME DEFAULT (datetime('now', '+5 hours', '+30 minutes')),
     updated_at DATETIME DEFAULT (datetime('now', '+5 hours', '+30 minutes')),
+    cart_id TEXT,
     FOREIGN KEY(student_id) REFERENCES students(id),
     FOREIGN KEY(component_id) REFERENCES components(id)
   )`);
+
+  try { await db.execute(`ALTER TABLE component_requests ADD COLUMN cart_id TEXT`); } catch (e) {}
+
+  await db.execute(`CREATE TABLE IF NOT EXISTS damage_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_id INTEGER,
+    student_id INTEGER,
+    component_id INTEGER,
+    severity TEXT,
+    note TEXT,
+    status TEXT DEFAULT 'PENDING',
+    reported_at DATETIME DEFAULT (datetime('now', '+5 hours', '+30 minutes')),
+    updated_at DATETIME DEFAULT (datetime('now', '+5 hours', '+30 minutes')),
+    admin_id INTEGER,
+    quantity INTEGER DEFAULT 1
+  )`);
+  try { await db.execute(`ALTER TABLE damage_reports ADD COLUMN updated_at DATETIME`); } catch (e) {}
+  try { await db.execute(`ALTER TABLE damage_reports ADD COLUMN admin_id INTEGER`); } catch (e) {}
+  try { await db.execute(`ALTER TABLE damage_reports ADD COLUMN quantity INTEGER DEFAULT 1`); } catch (e) {}
 
   // Settings table
   await db.execute(`CREATE TABLE IF NOT EXISTS settings (
@@ -296,7 +389,7 @@ function requireStudent(req, res, next) {
   // Case-insensitive delete to prevent duplicate admin rows (e.g. "Admin" vs "admin")
   await db.execute({ sql: "DELETE FROM admins WHERE LOWER(username) = LOWER(?)", args: ["admin"] });
   await db.execute({
-    sql: "INSERT INTO admins (username, password) VALUES (?, ?)",
+    sql: "INSERT INTO admins (username, password, role) VALUES (?, ?, 'ADMIN')",
     args: ["admin", hashed]
   });
   console.log("Default admin updated/created → admin / admin123");
@@ -352,31 +445,34 @@ async function ensureDbInitialized() {
 // Middleware to ensure DB is ready before any route
 app.use(async (req, res, next) => {
   // Allow these paths without DB
-  const staticPaths = ['/login.html', '/student-login.html', '/confirm-receipt.html', '/style.css', '/ennovate-logo.png', '/favicon.ico', '/debug-env'];
+  const staticPaths = ['/login.html', '/student-login.html', '/confirm-receipt.html', '/style.css', '/ennovate-logo.png', '/favicon.ico', '/debug-env', '/version'];
   if (staticPaths.includes(req.path)) return next();
 
-  try {
-    await ensureDbInitialized();
-    next();
-  } catch (err) {
-    console.error("Request failed due to DB error:", err.message);
-    res.status(500).json({
+  if (!dbReady) {
+    return res.status(503).json({
       success: false,
-      message: "Database connection failed. Check your Turso console and environment variables.",
-      error: err.message
+      message: "Database is still initializing. Please refresh in a few seconds."
     });
   }
+  next();
 });
 
 async function startApp() {
-
-
-  const PORT = process.env.PORT || 3000;
-  // Only listen if not running in a serverless environment (Vercel)
-  if (!process.env.VERCEL) {
-    app.listen(PORT, () => {
-      console.log(`ERP running on http://localhost:${PORT}`);
-    });
+  try {
+    console.log("Pre-initializing database...");
+    await ensureDbInitialized();
+    
+    const PORT = process.env.PORT || 3000;
+    // Only listen if not running in a serverless environment (Vercel)
+    if (!process.env.VERCEL) {
+      app.listen(PORT, () => {
+        console.log(`ERP running on http://localhost:${PORT}`);
+        console.log(`Version: ${CURRENT_VERSION}`);
+      });
+    }
+  } catch (err) {
+    console.error("FAILED TO START APP:", err);
+    if (process.env.NODE_ENV === "production") process.exit(1);
   }
 }
 
@@ -387,7 +483,7 @@ module.exports = app;
 app.get("/version", (req, res) => res.send(CURRENT_VERSION));
 
 
-const CURRENT_VERSION = "v1.3-detailed-login";
+const CURRENT_VERSION = "v1.3-damage-fix-v2";
 
 // ================= DEBUG ROUTE =================
 app.get("/debug-env", (req, res) => {
@@ -406,6 +502,7 @@ app.get("/debug-env", (req, res) => {
 app.get("/student-login", (req, res) => {
   res.redirect(302, "/student-login.html");
 });
+
 
 
 
@@ -446,6 +543,7 @@ app.post("/login", loginRateLimiter, async (req, res) => {
 
     loginAttempts.delete(req.ip);
     req.session.admin = admin.id;
+    req.session.role = admin.role || 'ADMIN';
     // Explicitly save the session before responding
     req.session.save((err) => {
       if (err) {
@@ -472,6 +570,10 @@ app.post("/change-admin", requireAdmin, async (req, res) => {
   if (!newUsername || !newPassword) return res.json({ success: false, message: "Missing fields" });
   try {
     const hashed = await bcrypt.hash(newPassword, 10);
+    const roleRes = await db.execute({ sql: "SELECT role FROM admins WHERE id = ?", args: [req.session.admin] });
+    const currentRole = roleRes.rows[0].role;
+    // Don't allow self-downgrade unless another admin exists? 
+    // Actually, user_request says "How sub-admins are created/assigned (by a full admin in settings)".
     await db.execute({ sql: "UPDATE admins SET username = ?, password = ? WHERE id = ?", args: [newUsername, hashed, req.session.admin] });
     res.json({ success: true });
   } catch (err) {
@@ -479,14 +581,156 @@ app.post("/change-admin", requireAdmin, async (req, res) => {
   }
 });
 
+app.get("/api/admin/me", requireAdmin, (req, res) => {
+  res.json({ id: req.session.admin, role: req.session.role });
+});
+
+// ================= REQUEST QUEUE APIS =================
+
+app.get("/api/admin/request-queue", requireAccess, async (req, res) => {
+  // Groups pending requests by cart_id (using a fallback for items without a cart_id)
+  const result = await db.execute(`
+    SELECT 
+      COALESCE(cr.cart_id, 'SINGLE-' || cr.id) as cart_id,
+      MIN(cr.created_at) as request_timestamp,
+      s.student_name,
+      s.usn,
+      s.phone,
+      COUNT(cr.id) as item_count,
+      GROUP_CONCAT(c.name || ' (x' || cr.quantity || ')') as summary
+    FROM component_requests cr
+    JOIN students s ON cr.student_id = s.id
+    JOIN components c ON cr.component_id = c.id
+    WHERE cr.status = 'PENDING'
+    GROUP BY COALESCE(cr.cart_id, 'SINGLE-' || cr.id)
+    ORDER BY request_timestamp DESC
+  `);
+  res.json(result.rows);
+});
+
+app.get("/api/admin/request-cart/:cart_id", requireAccess, async (req, res) => {
+  const { cart_id } = req.params;
+  
+  // Get items
+  const items = await db.execute({
+    sql: `
+      SELECT 
+        cr.id, 
+        cr.component_id,
+        cr.quantity,
+        cr.purpose_note,
+        cr.status,
+        c.name as component_name,
+        c.available_quantity,
+        cr.rejection_reason
+      FROM component_requests cr
+      JOIN components c ON cr.component_id = c.id
+      WHERE COALESCE(cr.cart_id, 'SINGLE-' || cr.id) = ?
+    `,
+    args: [cart_id]
+  });
+
+  // Get student info from first item
+  let student_info = {};
+  if (items.rows.length > 0) {
+    const sRes = await db.execute({
+      sql: `SELECT s.student_name as name, s.usn, s.email, s.phone 
+            FROM component_requests cr 
+            JOIN students s ON cr.student_id = s.id 
+            WHERE COALESCE(cr.cart_id, 'SINGLE-' || cr.id) = ? LIMIT 1`,
+      args: [cart_id]
+    });
+    student_info = sRes.rows[0] || {};
+  }
+
+  res.json({ items: items.rows, student_info });
+});
+
+app.post("/api/admin/requests/bulk-action", requireAccess, async (req, res) => {
+  const { cart_id, items, action, main_note } = req.body;
+  try {
+    const admin_id = req.session.admin;
+    const results = [];
+    let shared_issue_id = null;
+    
+    console.log(`[QUEUE] Processing bulk-action for Cart: ${cart_id} | Action: ${action}`);
+    for (const item of items) {
+      try {
+        const crId = item.id;
+        const itemAction = item.action || action;
+        const note = item.note || main_note;
+        
+        if (itemAction === 'APPROVE') {
+          const reqRow = (await db.execute({ sql: "SELECT * FROM component_requests WHERE id = ?", args: [crId] })).rows[0];
+          if (!reqRow || reqRow.status !== 'PENDING') {
+             console.warn(`[QUEUE] Item ${crId} already processed or missing.`);
+             continue;
+          }
+          
+          const comp = (await db.execute({ sql: "SELECT available_quantity, name FROM components WHERE id = ?", args: [reqRow.component_id] })).rows[0];
+          if (!comp || comp.available_quantity < reqRow.quantity) {
+             console.warn(`[QUEUE] Stock fail for ${crId}: ${comp ? comp.available_quantity : 'NA'} < ${reqRow.quantity}`);
+             await db.execute({ sql: "UPDATE component_requests SET status = 'REJECTED', rejection_reason = 'Insufficient stock', admin_id = ?, updated_at = datetime('now', '+5 hours', '+30 minutes') WHERE id = ?", args: [admin_id, crId] });
+             continue;
+          }
+          
+          // 1. Mark as Approved
+          await db.execute({ sql: "UPDATE component_requests SET status = 'APPROVED', admin_id = ?, updated_at = datetime('now', '+5 hours', '+30 minutes') WHERE id = ?", args: [admin_id, crId] });
+          
+          // 2. Create Transaction (Issue) - ONLY ONCE PER CART
+          if (!shared_issue_id) {
+            const issueRes = await db.execute({ 
+              sql: "INSERT INTO issues (student_id, request_id) VALUES (?, ?)", 
+              args: [reqRow.student_id, crId] 
+            });
+            shared_issue_id = Number(issueRes.lastInsertRowid);
+            console.log(`[QUEUE] Created Shared Issue ID: ${shared_issue_id} for Cart: ${cart_id}`);
+          }
+          
+          // 3. Link Item to Issue
+          await db.execute({ 
+            sql: "INSERT INTO issue_items (issue_id, component_id, quantity, returned_quantity) VALUES (?, ?, ?, 0)", 
+            args: [shared_issue_id, reqRow.component_id, reqRow.quantity] 
+          });
+          
+          // 4. Update Stock
+          await db.execute({ 
+            sql: "UPDATE components SET available_quantity = available_quantity - ? WHERE id = ?", 
+            args: [reqRow.quantity, reqRow.component_id] 
+          });
+          
+          results.push({ id: crId, success: true });
+          
+        } else if (itemAction === 'REJECT') {
+          await db.execute({ 
+            sql: "UPDATE component_requests SET status = 'REJECTED', rejection_reason = ?, admin_id = ?, updated_at = datetime('now', '+5 hours', '+30 minutes') WHERE id = ?", 
+            args: [note, admin_id, crId] 
+          });
+          results.push({ id: crId, success: true, rejected: true });
+        }
+      } catch (e) { 
+        console.error(`[QUEUE] Error processing item ${item.id}:`, e);
+        results.push({ id: item.id, success: false, error: e.message });
+      }
+    }
+    res.json({ success: true, message: "Cart processed successfully", results });
+  } catch (err) {
+    console.error("Bulk action error:", err);
+    res.status(500).json({ success: false, message: "Processing failed" });
+  }
+});
+
 // ================= ADMIN MANAGEMENT =================
 
 app.post("/create-admin", requireAdmin, async (req, res) => {
-  const { newUsername, newPassword } = req.body;
+  const { newUsername, newPassword, role } = req.body;
   if (!newUsername || !newPassword) return res.json({ success: false, message: "Missing fields" });
   try {
     const hashed = await bcrypt.hash(newPassword, 10);
-    await db.execute({ sql: "INSERT INTO admins (username, password) VALUES (?, ?)", args: [newUsername, hashed] });
+    await db.execute({ 
+      sql: "INSERT INTO admins (username, password, role) VALUES (?, ?, ?)", 
+      args: [newUsername, hashed, role || 'SUB_ADMIN'] 
+    });
     res.json({ success: true });
   } catch (err) {
     res.json({ success: false, message: "Username already taken" });
@@ -494,7 +738,7 @@ app.post("/create-admin", requireAdmin, async (req, res) => {
 });
 
 app.get("/admins", requireAdmin, async (req, res) => {
-  const result = await db.execute("SELECT id, username FROM admins");
+  const result = await db.execute("SELECT id, username, role FROM admins");
   res.json(result.rows);
 });
 
@@ -573,7 +817,7 @@ app.get("/student-my-profile", requireStudent, (req, res) => {
 
 // ================= COMPONENT ROUTES =================
 
-app.post("/add-component", requireAdmin, async (req, res) => {
+app.post("/add-component", requireAccess, async (req, res) => {
   const { name, quantity, photo1, photo2 } = req.body;
   try {
     const existing = await db.execute({ sql: "SELECT * FROM components WHERE name = ?", args: [name] });
@@ -589,7 +833,7 @@ app.post("/add-component", requireAdmin, async (req, res) => {
   }
 });
 
-app.post("/edit-component", requireAdmin, async (req, res) => {
+app.post("/edit-component", requireAccess, async (req, res) => {
   const { id, new_total_quantity } = req.body;
   try {
     const result = await db.execute({ sql: "SELECT total_quantity, available_quantity FROM components WHERE id = ?", args: [id] });
@@ -687,12 +931,12 @@ app.get("/api/public/settings", async (req, res) => {
 
 // ================= SETTINGS ROUTES =================
 
-app.get("/api/admin/settings", requireAdmin, async (req, res) => {
+app.get("/api/admin/settings", requireAccess, async (req, res) => {
   const settings = await getSettings();
   res.json(settings);
 });
 
-app.put("/api/admin/settings", requireAdmin, async (req, res) => {
+app.put("/api/admin/settings", requireAccess, async (req, res) => {
   const updates = req.body;
   try {
     for (const [key, value] of Object.entries(updates)) {
@@ -711,38 +955,129 @@ app.put("/api/admin/settings", requireAdmin, async (req, res) => {
 
 // ================= RETURN SINGLE =================
 
-app.post("/return-item", requireAdmin, async (req, res) => {
-  const { item_id, return_quantity, component_id } = req.body;
+app.post("/return-item", requireAccess, async (req, res) => {
+  const { item_id, return_quantity, component_id, is_damaged, damage_severity, damage_note } = req.body;
+  const itemIdInt = parseInt(item_id);
+  const compIdInt = parseInt(component_id);
+  const qtyInt = parseInt(return_quantity);
+  
+  console.log(`[RETURN] Processing Item: ${itemIdInt} | Qty: ${qtyInt} | Damaged: ${is_damaged}`);
   try {
-    const result = await db.execute({ sql: "SELECT quantity, returned_quantity FROM issue_items WHERE id = ?", args: [item_id] });
-    if (result.rows.length === 0) return res.json({ message: "Item not found" });
+    const result = await db.execute({ 
+      sql: "SELECT ii.quantity, ii.returned_quantity, i.student_id FROM issue_items ii JOIN issues i ON ii.issue_id = i.id WHERE ii.id = ?", 
+      args: [itemIdInt] 
+    });
+    if (result.rows.length === 0) {
+      console.warn(`[RETURN] Item ${itemIdInt} not found in issue_items`);
+      return res.status(404).json({ success: false, message: "Item not found" });
+    }
     const row = result.rows[0];
     const remaining = row.quantity - row.returned_quantity;
-    if (return_quantity > remaining) return res.json({ message: "Return exceeds remaining" });
-    await db.execute({ sql: "UPDATE issue_items SET returned_quantity = returned_quantity + ? WHERE id = ?", args: [return_quantity, item_id] });
-    await db.execute({ sql: "UPDATE components SET available_quantity = available_quantity + ? WHERE id = ?", args: [return_quantity, component_id] });
-    res.json({ message: "Return processed" });
+    if (qtyInt > remaining) {
+      console.warn(`[RETURN] Qty ${qtyInt} exceeds remaining ${remaining}`);
+      return res.status(400).json({ success: false, message: `Return exceeds remaining (${remaining})` });
+    }
+
+    // Update issue_items
+    console.log(`[RETURN] Updating issue_items: ${itemIdInt} | Qty: +${qtyInt}`);
+    await db.execute({ 
+      sql: "UPDATE issue_items SET returned_quantity = returned_quantity + ?, updated_at = datetime('now', '+5 hours', '+30 minutes') WHERE id = ?", 
+      args: [qtyInt, itemIdInt] 
+    });
+    
+    // Update stock
+    if (damage_severity !== 'DESTROYED') {
+      await db.execute({ 
+        sql: "UPDATE components SET available_quantity = available_quantity + ? WHERE id = ?", 
+        args: [qtyInt, compIdInt] 
+      });
+    }
+
+    // Report damage if needed
+    if (is_damaged) {
+      const adminId = req.session.admin || 1; // Fallback to first admin if session is weird
+      console.log(`[RETURN] Reporting Damage for Item: ${itemIdInt} | Qty: ${qtyInt} | Severity: ${damage_severity} | Admin: ${adminId}`);
+      try {
+        await db.execute({
+          sql: "INSERT INTO damage_reports (item_id, student_id, component_id, severity, note, admin_id, quantity, reported_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now', '+5 hours', '+30 minutes'), datetime('now', '+5 hours', '+30 minutes'))",
+          args: [itemIdInt, row.student_id, compIdInt, damage_severity, damage_note, adminId, qtyInt]
+        });
+        console.log(`[RETURN] Damage Report inserted successfully`);
+      } catch (insertErr) {
+        console.error(`[RETURN] Damage Report INSERT failed:`, insertErr.message);
+        return res.status(500).json({ success: false, message: "Return updated, but damage report failed to save: " + insertErr.message });
+      }
+    }
+
+    res.json({ success: true, message: "Return processed" + (is_damaged ? " and damage reported" : "") });
   } catch (err) {
-    res.json({ message: "Error processing return" });
+    console.error("Return item error:", err);
+    res.status(500).json({ success: false, message: "Error processing return: " + err.message });
   }
 });
 
 // ================= RETURN ALL =================
 
-app.post("/return-all", requireAdmin, async (req, res) => {
+// ================= RETURN ALL =================
+
+app.post("/return-all", requireAccess, async (req, res) => {
   const { issue_id } = req.body;
+  const issueIdInt = parseInt(issue_id);
   try {
-    const result = await db.execute({ sql: "SELECT id, component_id, quantity, returned_quantity FROM issue_items WHERE issue_id = ?", args: [issue_id] });
-    for (const item of result.rows) {
-      const remaining = item.quantity - item.returned_quantity;
-      if (remaining > 0) {
-        await db.execute({ sql: "UPDATE issue_items SET returned_quantity = quantity WHERE id = ?", args: [item.id] });
-        await db.execute({ sql: "UPDATE components SET available_quantity = available_quantity + ? WHERE id = ?", args: [remaining, item.component_id] });
+    const items = await db.execute({ 
+      sql: "SELECT id, component_id, (quantity - returned_quantity) AS unreturned FROM issue_items WHERE issue_id = ?", 
+      args: [issueIdInt] 
+    });
+    
+    for (const item of items.rows) {
+      if (item.unreturned > 0) {
+        // Simple return all (no damage reporting in bulk for now)
+        await db.execute({ 
+          sql: "UPDATE issue_items SET returned_quantity = quantity, updated_at = datetime('now', '+5 hours', '+30 minutes') WHERE id = ?", 
+          args: [item.id] 
+        });
+        await db.execute({ 
+          sql: "UPDATE components SET available_quantity = available_quantity + ? WHERE id = ?", 
+          args: [item.unreturned, item.component_id] 
+        });
       }
     }
-    res.json({ message: "All items returned successfully" });
+    res.json({ success: true, message: "Transaction completed. All items returned." });
   } catch (err) {
-    res.json({ message: "Error returning items" });
+    console.error("Bulk return error:", err);
+    res.status(500).json({ success: false, message: "Error in bulk return" });
+  }
+});
+
+// ================= DAMAGE REPORTS API =================
+
+app.get("/api/admin/damage-reports", requireAccess, async (req, res) => {
+  try {
+    const result = await db.execute(`
+      SELECT dr.*, c.name as component_name, s.student_name, s.usn, s.email, a.username as admin_name
+      FROM damage_reports dr
+      JOIN components c ON dr.component_id = c.id
+      JOIN students s ON dr.student_id = s.id
+      LEFT JOIN admins a ON dr.admin_id = a.id
+      ORDER BY dr.reported_at DESC
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Damage reports error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+app.post("/api/admin/damage-report-resolve", requireAccess, async (req, res) => {
+  const { id, status } = req.body;
+  try {
+    await db.execute({ 
+      sql: "UPDATE damage_reports SET status = ?, updated_at = datetime('now', '+5 hours', '+30 minutes') WHERE id = ?", 
+      args: [status, id] 
+    });
+    res.json({ success: true, message: "Status updated" });
+  } catch (err) {
+    res.json({ success: false, message: "Error updating status" });
   }
 });
 
@@ -761,11 +1096,16 @@ app.get("/transactions", requireAdmin, async (req, res) => {
       components.name AS component_name,
       issue_items.quantity,
       issue_items.returned_quantity,
-      (issue_items.quantity - issue_items.returned_quantity) AS remaining
+      (issue_items.quantity - issue_items.returned_quantity) AS remaining,
+      issue_items.updated_at AS return_timestamp,
+      dr.severity AS damage_severity,
+      dr.note AS damage_note,
+      dr.reported_at AS damage_timestamp
     FROM issues
     JOIN students ON issues.student_id = students.id
     JOIN issue_items ON issue_items.issue_id = issues.id
     JOIN components ON issue_items.component_id = components.id
+    LEFT JOIN damage_reports dr ON dr.item_id = issue_items.id
     ORDER BY issues.issue_timestamp DESC
   `);
   res.json(result.rows);
@@ -782,7 +1122,7 @@ app.post("/delete-transaction", requireAdmin, async (req, res) => {
       }
     }
     await db.execute({ sql: "DELETE FROM issue_items WHERE issue_id = ?", args: [issue_id] });
-    await db.execute({ sql: "DELETE FROM issues WHERE id = ?", args: [issue_id] });
+    await db.execute({ sql: "DELETE FROM issues WHERE issue_id = ?", args: [issue_id] });
     res.json({ success: true, message: "Transaction deleted" });
   } catch (err) {
     res.json({ success: false, message: "Error deleting transaction" });
@@ -795,6 +1135,7 @@ app.get("/student/:usn", async (req, res) => {
   const result = await db.execute({
     sql: `
       SELECT 
+        issues.id AS issue_id,
         students.student_name,
         students.usn,
         students.phone,
@@ -805,7 +1146,8 @@ app.get("/student/:usn", async (req, res) => {
         components.name AS component_name,
         issue_items.quantity,
         issue_items.returned_quantity,
-        (issue_items.quantity - issue_items.returned_quantity) AS remaining
+        (issue_items.quantity - issue_items.returned_quantity) AS remaining,
+        issue_items.updated_at AS return_timestamp
       FROM issues
       JOIN students ON issues.student_id = students.id
       JOIN issue_items ON issue_items.issue_id = issues.id
@@ -846,17 +1188,21 @@ app.get("/students", requireAdmin, async (req, res) => {
   res.json(rows);
 });
 
-app.post("/edit-student", requireAdmin, async (req, res) => {
-  const { id, student_name, usn, phone } = req.body;
+app.post("/edit-student", requireAccess, async (req, res) => {
+  const { id, student_name, usn, phone, email, semester, department } = req.body;
   try {
-    await db.execute({ sql: "UPDATE students SET student_name = ?, usn = ?, phone = ? WHERE id = ?", args: [student_name, usn, phone, id] });
+    await db.execute({ 
+      sql: "UPDATE students SET student_name = ?, usn = ?, phone = ?, email = ?, semester = ?, department = ? WHERE id = ?", 
+      args: [student_name, usn, phone || null, email, semester || null, department || null, id] 
+    });
     res.json({ success: true, message: "Student updated" });
   } catch (err) {
-    res.json({ success: false, message: "Error updating student (USN may conflict)" });
+    console.error("Edit student error:", err);
+    res.json({ success: false, message: "Error updating student (USN or Email may conflict)" });
   }
 });
 
-app.post("/delete-student", requireAdmin, async (req, res) => {
+app.post("/delete-student", requireAccess, async (req, res) => {
   const { id } = req.body;
   try {
     const active = await db.execute({ sql: `SELECT COUNT(*) AS count FROM issue_items JOIN issues ON issue_items.issue_id = issues.id WHERE issues.student_id = ? AND (issue_items.quantity - issue_items.returned_quantity) > 0`, args: [id] });
@@ -1147,8 +1493,9 @@ app.get("/download-report-pdf", requireAdmin, async (req, res) => {
   const { usn, startDate, endDate } = req.query;
 
   let query = `
-    SELECT issues.issue_timestamp, students.student_name, students.usn,
-      components.name AS component_name, issue_items.quantity, issue_items.returned_quantity
+    SELECT issues.id AS issue_id, issues.issue_timestamp, students.student_name, students.usn,
+      components.name AS component_name, issue_items.quantity, issue_items.returned_quantity,
+      issue_items.updated_at AS return_timestamp
     FROM issues
     JOIN students ON issues.student_id = students.id
     JOIN issue_items ON issue_items.issue_id = issues.id
@@ -1204,19 +1551,20 @@ app.get("/download-report-pdf", requireAdmin, async (req, res) => {
   if (rows.length > 0) {
     await doc.table({
       headers: [
-        { label: "Date", width: 90, headerColor: "#2563eb", headerOpacity: 1 },
-        { label: "Student", width: 100, headerColor: "#2563eb", headerOpacity: 1 },
-        { label: "USN", width: 85, headerColor: "#2563eb", headerOpacity: 1 },
-        { label: "Component", width: 105, headerColor: "#2563eb", headerOpacity: 1 },
-        { label: "Issued", width: 55, headerColor: "#2563eb", headerOpacity: 1, align: "center" },
-        { label: "Returned", width: 60, headerColor: "#2563eb", headerOpacity: 1, align: "center" }
+        { label: "Cart ID", width: 55, headerColor: "#2563eb", headerOpacity: 1, align: "center" },
+        { label: "Date", width: 85, headerColor: "#2563eb", headerOpacity: 1 },
+        { label: "Student", width: 95, headerColor: "#2563eb", headerOpacity: 1 },
+        { label: "USN", width: 80, headerColor: "#2563eb", headerOpacity: 1 },
+        { label: "Component", width: 95, headerColor: "#2563eb", headerOpacity: 1 },
+        { label: "Issued", width: 45, headerColor: "#2563eb", headerOpacity: 1, align: "center" },
+        { label: "Returned", width: 40, headerColor: "#2563eb", headerOpacity: 1, align: "center" }
       ],
       rows: rows.map(r => {
         totalIssued += r.quantity;
         totalReturned += r.returned_quantity;
-        return [r.issue_timestamp, r.student_name, r.usn, r.component_name, String(r.quantity), String(r.returned_quantity)];
+        return [String(r.issue_id), r.issue_timestamp.split(" ")[0], r.student_name, r.usn, r.component_name, String(r.quantity), String(r.returned_quantity)];
       })
-    }, { prepareHeader: () => doc.font("Helvetica-Bold").fontSize(9).fillColor("#ffffff"), prepareRow: () => { doc.font("Helvetica").fontSize(8).fillColor("#334155"); return doc; }, padding: 5, columnsSize: [90, 100, 85, 105, 55, 60] });
+    }, { prepareHeader: () => doc.font("Helvetica-Bold").fontSize(8).fillColor("#ffffff"), prepareRow: () => { doc.font("Helvetica").fontSize(7).fillColor("#334155"); return doc; }, padding: 4, columnsSize: [55, 85, 95, 80, 95, 45, 40] });
 
     // Summary Box
     doc.moveDown(1.5);
@@ -1248,8 +1596,9 @@ app.get("/download-report-excel", requireAdmin, async (req, res) => {
   const { usn, startDate, endDate } = req.query;
 
   let query = `
-    SELECT issues.issue_timestamp, students.student_name, students.usn,
-      components.name AS component_name, issue_items.quantity, issue_items.returned_quantity
+    SELECT issues.id AS issue_id, issues.issue_timestamp, students.student_name, students.usn,
+      components.name AS component_name, issue_items.quantity, issue_items.returned_quantity,
+      issue_items.updated_at AS return_timestamp
     FROM issues
     JOIN students ON issues.student_id = students.id
     JOIN issue_items ON issue_items.issue_id = issues.id
@@ -1275,12 +1624,14 @@ app.get("/download-report-excel", requireAdmin, async (req, res) => {
   const sheet = workbook.addWorksheet("Report");
 
   sheet.columns = [
+    { header: "Cart ID", key: "issue_id", width: 10 },
     { header: "Timestamp", key: "timestamp", width: 20 },
     { header: "Student Name", key: "name", width: 20 },
     { header: "USN", key: "usn", width: 15 },
     { header: "Component", key: "component", width: 20 },
     { header: "Issued", key: "issued", width: 10 },
-    { header: "Returned", key: "returned", width: 10 }
+    { header: "Returned", key: "returned", width: 10 },
+    { header: "Returned At", key: "return_timestamp", width: 20 }
   ];
 
   let totalIssued = 0, totalReturned = 0;
@@ -1289,12 +1640,14 @@ app.get("/download-report-excel", requireAdmin, async (req, res) => {
     totalIssued += row.quantity;
     totalReturned += row.returned_quantity;
     sheet.addRow({
+      issue_id: row.issue_id,
       timestamp: row.issue_timestamp,
       name: row.student_name,
       usn: row.usn,
       component: row.component_name,
       issued: row.quantity,
-      returned: row.returned_quantity
+      returned: row.returned_quantity,
+      return_timestamp: row.return_timestamp || ''
     });
   });
 
@@ -1404,7 +1757,7 @@ app.get("/api/student/dashboard", requireStudent, async (req, res) => {
     // Pending requests
     const pending = await db.execute({
       sql: `SELECT cr.id, cr.quantity, cr.purpose_note, cr.status, cr.created_at, cr.updated_at,
-              c.name AS component_name
+              c.name AS component_name, cr.cart_id
             FROM component_requests cr JOIN components c ON cr.component_id = c.id
             WHERE cr.student_id = ? AND cr.status IN ('PENDING', 'DRAFT')
             ORDER BY cr.created_at DESC`, args: [sid]
@@ -1412,7 +1765,7 @@ app.get("/api/student/dashboard", requireStudent, async (req, res) => {
     // Recent history
     const history = await db.execute({
       sql: `SELECT cr.id, cr.quantity, cr.purpose_note, cr.status, cr.created_at, cr.confirmed_at,
-              c.name AS component_name, cr.rejection_reason
+              c.name AS component_name, cr.rejection_reason, cr.cart_id
             FROM component_requests cr JOIN components c ON cr.component_id = c.id
             WHERE cr.student_id = ? AND cr.status NOT IN ('PENDING', 'DRAFT')
             ORDER BY cr.updated_at DESC LIMIT 50`, args: [sid]
@@ -1484,7 +1837,14 @@ app.get("/api/student/profile-summary", requireStudent, async (req, res) => {
 app.get("/api/student/catalog", requireStudent, async (req, res) => {
   try {
     const result = await db.execute("SELECT id, name, total_quantity, available_quantity, photo1, photo2 FROM components ORDER BY name ASC");
-    res.json(result.rows);
+    // Normalize IDs to String for consistent frontend comparison
+    const rows = result.rows.map(r => ({
+      ...r,
+      id: String(r.id),
+      total_quantity: Number(r.total_quantity),
+      available_quantity: Number(r.available_quantity)
+    }));
+    res.json(rows);
   } catch (err) {
     res.status(500).json({ message: "Server error" });
   }
@@ -1510,9 +1870,10 @@ app.post("/api/student/request", requireStudent, async (req, res) => {
       return res.json({ success: false, message: `Insufficient stock. Only ${comp.rows[0].available_quantity} available.` });
     }
 
+    const cart_id = "SINGLE-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
     await db.execute({
-      sql: `INSERT INTO component_requests (student_id, component_id, quantity, purpose_note, status) VALUES (?, ?, ?, ?, 'PENDING')`,
-      args: [req.session.student_id, component_id, quantity, purpose_note || null]
+      sql: `INSERT INTO component_requests (student_id, component_id, quantity, purpose_note, status, cart_id) VALUES (?, ?, ?, ?, 'PENDING', ?)`,
+      args: [req.session.student_id, component_id, quantity, purpose_note || null, cart_id]
     });
     res.json({ success: true, message: "Request submitted successfully" });
   } catch (err) {
@@ -1553,14 +1914,17 @@ app.post("/api/student/request-bulk", requireStudent, async (req, res) => {
     }
 
     // 2. Insertion loop
+    const student_id = req.session.student_id;
+    const cart_id = "CART-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
+
     for (const item of items) {
       await db.execute({
-        sql: `INSERT INTO component_requests (student_id, component_id, quantity, purpose_note, status) VALUES (?, ?, ?, ?, 'PENDING')`,
-        args: [req.session.student_id, item.component_id, item.quantity, purpose_note || null]
+        sql: `INSERT INTO component_requests (student_id, component_id, quantity, purpose_note, status, cart_id) VALUES (?, ?, ?, ?, 'PENDING', ?)`,
+        args: [student_id, item.component_id, item.quantity, purpose_note || null, cart_id]
       });
     }
 
-    res.json({ success: true, message: "All requests submitted successfully! ✅" });
+    res.json({ success: true, message: "All requests submitted successfully! ✅", cart_id });
   } catch (err) {
     console.error("Bulk request submit error:", err);
     res.json({ success: false, message: "Error submitting requests" });
@@ -1572,7 +1936,7 @@ app.get("/api/student/requests", requireStudent, async (req, res) => {
   try {
     const result = await db.execute({
       sql: `SELECT cr.id, cr.quantity, cr.purpose_note, cr.status, cr.created_at, cr.updated_at,
-              cr.rejection_reason, cr.confirmed_at,
+              cr.rejection_reason, cr.confirmed_at, cr.cart_id,
               c.name AS component_name, c.id AS component_id
             FROM component_requests cr JOIN components c ON cr.component_id = c.id
             WHERE cr.student_id = ?
@@ -1980,13 +2344,15 @@ async function refreshBackupSchedule() {
 // Start initial schedule
 setTimeout(() => refreshBackupSchedule(), 5000);
 
-// Create first backup on startup (after 30s delay)
+// Schedule auto-backup (startup backup disabled temporarily for stability)
+/*
 setTimeout(async () => {
   if (dbReady) {
     const now = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
     await createBackup(`startup_${now}`);
   }
 }, 30000);
+*/
 
 // Manual backup trigger
 app.post("/api/admin/create-backup", requireAdmin, async (req, res) => {

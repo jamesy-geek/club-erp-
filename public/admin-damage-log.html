@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Damage Log — CERP</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/style.css">
+  <script>if (localStorage.getItem("darkMode") == "true") document.documentElement.className = "dark"</script>
+  <script src="/club-branding.js"></script>
+</head>
+<body>
+  <div class="menu-toggle" onclick="toggleMenu()">☰ Menu</div>
+  <div class="layout">
+    <div class="sidebar" id="sidebar">
+      <h2><img src="/ennovate-logo.png" alt=""> CERP</h2>
+      <a href="/" id="nav-dashboard">Dashboard</a>
+      <a href="/components-page" id="nav-components">Components</a>
+      <a href="/transactions-page" id="nav-transactions">Transactions</a>
+      <a href="/reports-page" id="nav-reports">Reports</a>
+      <a href="/students-page" id="nav-students">Students</a>
+      <a href="/student_profile.html" id="nav-profile">Student Profile</a>
+      <a href="/admin-requests-page" id="nav-requests">Request Queue</a>
+      <a href="/admin-damage-log.html" class="active" id="nav-damage">Damage Log</a>
+      <hr>
+      <a href="/admin-settings.html" id="nav-settings">Admin Settings</a>
+      <a href="#" onclick="logout()">Logout</a>
+    </div>
+
+    <div class="content">
+      <h1>Equipment Damage Log</h1>
+      <p style="color:#64748b; margin-top:-16px; margin-bottom:20px; font-size:14px;">Track and resolve hardware damage reports</p>
+
+      <div id="damageList" style="display: flex; flex-direction: column; gap:12px;"></div>
+      <div id="emptyState" style="display:none; text-align:center; padding: 40px; color: #94a3b8;">
+        <p>No damage reports found. 🚀</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    async function loadReports() {
+      try {
+        const res = await fetch("/api/admin/damage-reports");
+        if (res.status === 401) { window.location.href = "/login.html"; return; }
+        const data = await res.json();
+        renderReports(data);
+      } catch (e) { showToast("Error loading logs", false); }
+    }
+
+    function renderReports(reports) {
+      const container = document.getElementById("damageList");
+      const empty = document.getElementById("emptyState");
+      
+      if (reports.length === 0) {
+        container.innerHTML = "";
+        empty.style.display = "block";
+        return;
+      }
+      
+      empty.style.display = "none";
+      container.innerHTML = reports.map(r => `
+        <div class="card" style="border-left: 5px solid ${r.severity === 'DESTROYED' ? '#ef4444' : r.severity === 'MAJOR' ? '#f59e0b' : '#3b82f6'};">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div>
+              <strong style="font-size: 16px;">${r.component_name} ${r.quantity > 1 ? `(x${r.quantity})` : ''}</strong>
+              <span class="badge" style="margin-left:8px; background:${getSeverityColor(r.severity)}; color:white; font-size:10px;">${r.severity}</span>
+              ${r.status === 'RESOLVED' ? '<span class="badge" style="background:#16a34a; color:white; margin-left:5px;">RESOLVED</span>' : ''}
+              <br>
+              <span style="font-size:13px; color:#64748b;">👤 ${r.student_name} (${r.usn})</span>
+            </div>
+            <span style="font-size:11px; color:#94a3b8;">🕒 ${new Date(r.reported_at).toLocaleString()}</span>
+          </div>
+          <p style="margin: 10px 0; background:#f8fafc; padding:8px; border-radius:6px; font-size:13px;">
+            📝 <strong>Admin Note:</strong> ${r.note || 'No description provided'}
+          </p>
+          <div style="display:flex; justify-content:flex-end; gap:8px;">
+            ${r.status === 'PENDING' ? `
+              <button class="btn-sm" style="background:#2563eb;" onclick="resolveReport(${r.id}, 'RESOLVED')">Mark as RESOLVED</button>
+            ` : `
+              <button class="btn-sm" style="background:#64748b;" onclick="resolveReport(${r.id}, 'PENDING')">Re-open</button>
+            `}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function getSeverityColor(s) {
+      if (s === 'DESTROYED') return '#ef4444';
+      if (s === 'MAJOR') return '#f59e0b';
+      return '#3b82f6';
+    }
+
+    async function resolveReport(id, status) {
+      try {
+        const res = await fetch("/api/admin/damage-report-resolve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, status })
+        });
+        if ((await res.json()).success) loadReports();
+      } catch (e) { showToast("Action failed", false); }
+    }
+
+    function showToast(message, success = true) {
+      const toast = document.getElementById("toast");
+      toast.style.background = success ? "#16a34a" : "#dc2626";
+      toast.innerText = message;
+      toast.style.display = "block";
+      setTimeout(() => toast.style.display = "none", 2500);
+    }
+
+    function toggleMenu() { document.getElementById("sidebar").classList.toggle("active"); }
+    async function logout() { await fetch("/logout", { method: "POST" }); window.location.href = "/login.html"; }
+
+    window.onload = loadReports;
+  </script>
+</body>
+</html>

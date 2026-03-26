@@ -139,8 +139,9 @@
         <input id="newAdminPass" type="password" placeholder="Password">
 
         <label>Role</label>
-        <select id="newAdmin">
-          <option value="admin">Admin</option>
+        <select id="newAdminRole" style="width: 100%; border:1px solid #e2e8f0; border-radius: 6px; padding: 8px;">
+          <option value="ADMIN">Full Admin (All Access)</option>
+          <option value="SUB_ADMIN">Sub-Admin (Restricted)</option>
         </select>
 
         <button style="margin-top:15px;" onclick="createAdmin()">Create Admin</button>
@@ -335,7 +336,7 @@
 
       const username = document.getElementById("newAdminUser").value.trim();
       const password = document.getElementById("newAdminPass").value.trim();
-      const role = document.getElementById("newAdmin").value;
+      const role = document.getElementById("newAdminRole").value;
 
       if (!username || !password) {
         showToast("Both fields required", false);
@@ -345,7 +346,7 @@
       const res = await fetch("/create-admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password, role })
+        body: JSON.stringify({ newUsername: username, newPassword: password, role: role })
       });
 
       const data = await res.json();

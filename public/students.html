@@ -62,18 +62,36 @@
 
     <!-- Edit Modal -->
     <div id="editModal" class="modal">
-        <div class="modal-content">
-            <h2 id="modalLabel">Edit Student</h2>
-            <div class="form-group" style="margin-bottom: 15px;">
-                <label>Name</label>
-                <input type="text" id="editName"
-                    style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ccc;">
+        <div class="modal-content" style="width: 500px;">
+            <h2 id="modalLabel">Edit Student Profile</h2>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="editName" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;">
+                </div>
+                <div class="form-group">
+                    <label>USN</label>
+                    <input type="text" id="editUSN" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;">
+                </div>
+                <div class="form-group">
+                    <label>Email ID</label>
+                    <input type="email" id="editEmail" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;">
+                </div>
+                <div class="form-group">
+                    <label>Phone Number</label>
+                    <input type="text" id="editPhone" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;">
+                </div>
+                <div class="form-group">
+                    <label>Semester</label>
+                    <input type="text" id="editSemester" placeholder="e.g. 4th" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;">
+                </div>
+                <div class="form-group">
+                    <label>Department</label>
+                    <input type="text" id="editDepartment" placeholder="e.g. CSE" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;">
+                </div>
             </div>
-            <div class="form-group" style="margin-bottom: 15px;">
-                <label>Phone</label>
-                <input type="text" id="editPhone"
-                    style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ccc;">
-            </div>
+
             <div style="display: flex; gap: 10px; justify-content: flex-end;">
                 <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
                 <button class="btn btn-primary" onclick="saveStudent()">Save Changes</button>
@@ -159,15 +177,14 @@
 
         function renderTable(students) {
             const table = document.getElementById("studentsTable");
-            table.innerHTML = students.map(s => `
+            table.innerHTML = students.map((s, idx) => `
         <tr>
           <td><span style="font-weight: 600; color: #1e293b;">${s.student_name}</span></td>
           <td><code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; color: #475569;">${(s.usn || '').toUpperCase()}</code></td>
           <td>${s.phone || 'N/A'}</td>
           <td class="actions-cell">
             <button class="btn btn-secondary" onclick="viewProfile('${(s.usn || '').toUpperCase()}')">View</button>
-
-            <button class="btn btn-primary" onclick="openEditModal(${s.id}, '${s.student_name.replace(/'/g, "\\'")}', '${s.phone || ''}')">Edit</button>
+            <button class="btn btn-primary" onclick="openEditModal(${idx})">Edit</button>
             <button class="btn btn-danger" onclick="deleteStudent(${s.id}, '${s.student_name.replace(/'/g, "\\'")}')">Delete</button>
           </td>
         </tr>
@@ -177,8 +194,8 @@
         function filterTable() {
             const query = document.getElementById("searchInput").value.toLowerCase();
             const filtered = allStudents.filter(s =>
-                s.student_name.toLowerCase().includes(query) ||
-                s.usn.toLowerCase().includes(query)
+                (s.student_name || '').toLowerCase().includes(query) ||
+                (s.usn || '').toLowerCase().includes(query)
             );
             renderTable(filtered);
         }
@@ -188,10 +205,15 @@
             window.location.href = `/student_profile.html?usn=${usn}`;
         }
 
-        function openEditModal(id, name, phone) {
-            currentStudentId = id;
-            document.getElementById("editName").value = name;
-            document.getElementById("editPhone").value = phone;
+        function openEditModal(idx) {
+            const s = allStudents[idx];
+            currentStudentId = s.id;
+            document.getElementById("editName").value = s.student_name || "";
+            document.getElementById("editUSN").value = s.usn || "";
+            document.getElementById("editEmail").value = s.email || "";
+            document.getElementById("editPhone").value = s.phone || "";
+            document.getElementById("editSemester").value = s.semester || "";
+            document.getElementById("editDepartment").value = s.department || "";
             document.getElementById("editModal").style.display = "flex";
         }
 
@@ -200,13 +222,20 @@
         }
 
         async function saveStudent() {
-            const name = document.getElementById("editName").value;
-            const phone = document.getElementById("editPhone").value;
+            const payload = {
+                id: currentStudentId,
+                student_name: document.getElementById("editName").value,
+                usn: document.getElementById("editUSN").value,
+                email: document.getElementById("editEmail").value,
+                phone: document.getElementById("editPhone").value,
+                semester: document.getElementById("editSemester").value,
+                department: document.getElementById("editDepartment").value
+            };
 
             const res = await fetch("/edit-student", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ id: currentStudentId, student_name: name, phone })
+                body: JSON.stringify(payload)
             });
 
             const result = await res.json();

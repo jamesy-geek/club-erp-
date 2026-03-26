@@ -15,8 +15,8 @@
     ty = e.clientY;
   });
   function loop() {
-    cx += (tx - cx) * 0.22;
-    cy += (ty - cy) * 0.22;
+    cx += (tx - cx) * 0.45;
+    cy += (ty - cy) * 0.45;
     cur.style.left = cx + "px";
     cur.style.top = cy + "px";
     requestAnimationFrame(loop);

@@ -273,8 +273,7 @@ body.student-portal::before {
   justify-content: center;
   padding: 12px 18px;
   border: none;
-  transition: background 0.15s, color 0.15s, border-color 0.15s, filter 0.15s, transform 0.12s ease-out;
-  transform: translate(var(--sp-mx, 0), var(--sp-my, 0));
+  transition: background 0.15s, color 0.15s, border-color 0.15s, filter 0.15s;
 }
 
 .sp-btn--primary,
@@ -465,8 +464,9 @@ label.sp-label {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #fff;
-  mix-blend-mode: difference;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  backdrop-filter: invert(0.2);
   pointer-events: none;
   z-index: 10050;
   transform: translate(-50%, -50%);
@@ -723,7 +723,6 @@ label.sp-label {
   border: 1px solid var(--border);
   color: var(--dim);
   cursor: pointer;
-  transform: translate(var(--sp-mx, 0), var(--sp-my, 0));
 }
 
 .sp-filter-row button.is-on {
@@ -1099,8 +1098,7 @@ body.student-portal .dark-mode-toggle {
 
 /* Glitch Title Effect */
 .sp-title:hover {
-  animation: sp-glitch 0.2s linear infinite;
-  text-shadow: 2px 0 #ff00c1, -2px 0 #00fff9;
+  filter: brightness(1.1);
 }
 
 @keyframes sp-glitch {

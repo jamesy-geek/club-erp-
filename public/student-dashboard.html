@@ -92,12 +92,19 @@
     }
     async function loadDashboard() {
       try {
-        const sRes = await fetch("/student-session", { credentials: "same-origin" });
+        let sRes = await fetch("/student-session", { credentials: "same-origin" });
+        // Retry once if 401 (Wait 500ms first) - handles transient store lag
+        if (sRes.status === 401) {
+          await new Promise(r => setTimeout(r, 600));
+          sRes = await fetch("/student-session", { credentials: "same-origin" });
+        }
         if (sRes.status === 401) { window.location.href = "/student-login.html"; return; }
         const student = await sRes.json();
-        document.getElementById("studentName").textContent = student.student_name;
-        document.getElementById("studentUSN").textContent = (student.usn || "").toUpperCase();
-      } catch (e) { window.location.href = "/student-login.html"; return; }
+        const nEl = document.getElementById("studentName");
+        const uEl = document.getElementById("studentUSN");
+        if (nEl) nEl.textContent = student.student_name;
+        if (uEl) uEl.textContent = (student.usn || "").toUpperCase();
+      } catch (e) { console.error("Session fetch error:", e); }
 
       try {
         const res = await fetch("/api/student/dashboard", { credentials: "same-origin" });

@@ -39,6 +39,40 @@
         taglineEl.textContent = tagline;
       }
     }
+    // 4. Role-based Sidebar Masking & Link Injection
+    try {
+      const meRes = await fetch("/api/admin/me");
+      if (meRes.ok) {
+        const me = await meRes.json();
+        const sidebar = document.getElementById("sidebar") || document.querySelector(".sidebar");
+        if (!sidebar) return;
+
+        // 1. Inject Damage Log link if not there
+        const existingDamage = [...sidebar.querySelectorAll("a")].find(a => a.textContent.includes("Damage Log"));
+        if (!existingDamage) {
+          const reqQueue = [...sidebar.querySelectorAll("a")].find(a => a.textContent.includes("Request Queue"));
+          if (reqQueue) {
+            const dmgLink = document.createElement("a");
+            dmgLink.href = "/admin-damage-log.html";
+            dmgLink.id = "nav-damage";
+            dmgLink.textContent = "Damage Log";
+            if (window.location.pathname.includes("admin-damage-log.html")) dmgLink.className = "active";
+            reqQueue.insertAdjacentElement("afterend", dmgLink);
+          }
+        }
+
+        // 2. Role-based masking
+        if (me && me.role === 'SUB_ADMIN') {
+          const restrictedTitles = ['Settings', 'Students', 'Components', 'Profile'];
+          sidebar.querySelectorAll("a").forEach(a => {
+            if (restrictedTitles.some(t => a.textContent.includes(t))) {
+              a.style.display = 'none';
+            }
+          });
+        }
+      }
+    } catch (e) { /* admin only, students skip silently */ }
+
   } catch (error) {
     console.error("Branding update failed:", error);
   }

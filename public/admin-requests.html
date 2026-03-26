@@ -12,21 +12,18 @@
 <body>
 
   <div class="menu-toggle" onclick="toggleMenu()">☰ Menu</div>
-
   <div class="layout">
-
     <div class="sidebar" id="sidebar">
       <h2><img src="/ennovate-logo.png" alt=""> CERP</h2>
       <a href="/" id="nav-dashboard">Dashboard</a>
-      <a href="/components-page">Components</a>
-      <a href="/transactions-page">Transactions</a>
-
-      <a href="/reports-page">Reports</a>
-      <a href="/students-page">Students</a>
-      <a href="/student_profile.html">Student Profile</a>
-      <a href="/admin-requests-page" class="active">Request Queue</a>
+      <a href="/components-page" id="nav-components">Components</a>
+      <a href="/transactions-page" id="nav-transactions">Transactions</a>
+      <a href="/reports-page" id="nav-reports">Reports</a>
+      <a href="/students-page" id="nav-students">Students</a>
+      <a href="/student_profile.html" id="nav-profile">Student Profile</a>
+      <a href="/admin-requests-page" class="active" id="nav-requests">Request Queue</a>
       <hr>
-      <a href="/admin-settings.html">Admin Settings</a>
+      <a href="/admin-settings.html" id="nav-settings">Admin Settings</a>
       <a href="#" onclick="logout()">Logout</a>
       <div class="sidebar-footer">
         <img src="/ennovate-logo.png" alt="">
@@ -36,69 +33,55 @@
 
     <div class="content">
       <h1>Request Queue</h1>
-      <p style="color:#64748b; margin-top:-16px; margin-bottom:20px; font-size:14px;">Review and manage student
-        component requests</p>
+      <p style="color:#64748b; margin-top:-16px; margin-bottom:20px; font-size:14px;">Review and manage student equipment carts</p>
 
-      <!-- Filter tabs -->
-      <div style="display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap;">
-        <button onclick="loadRequests('ALL')" class="btn-sm" style="background:#0f172a;" id="fAll">All</button>
-        <button onclick="loadRequests('PENDING')" class="btn-sm" style="background:#f59e0b;"
-          id="fPending">Pending</button>
-        <button onclick="loadRequests('APPROVED')" class="btn-sm" style="background:#16a34a;"
-          id="fApproved">Approved</button>
-        <button onclick="loadRequests('REJECTED')" class="btn-sm" style="background:#dc2626;"
-          id="fRejected">Rejected</button>
-        <button onclick="loadRequests('CONFIRMED')" class="btn-sm" style="background:#0891b2;"
-          id="fConfirmed">Confirmed</button>
+      <div id="queueContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px;">
+        <!-- Cart cards will be injected here -->
       </div>
-
-      <div id="requestsList"></div>
-    </div>
-  </div>
-
-  <!-- Reject Modal -->
-  <div class="modal-overlay" id="rejectModal">
-    <div class="modal-box">
-      <h2>Reject Request</h2>
-      <input type="hidden" id="rejectReqId">
-      <label>Reason (optional)</label>
-      <textarea id="rejectReason" rows="3" placeholder="Reason for rejection..." style="resize:vertical;"></textarea>
-      <div class="modal-actions">
-        <button class="btn-cancel" onclick="closeRejectModal()">Cancel</button>
-        <button onclick="confirmReject()" style="background:#dc2626;">Reject Request</button>
+      <div id="emptyState" style="display:none; text-align:center; padding: 40px; color: #94a3b8;">
+        <p>No pending requests in the queue. ✅</p>
       </div>
     </div>
   </div>
 
-  <!-- Edit Modal -->
-  <div class="modal-overlay" id="adminEditModal">
-    <div class="modal-box">
-      <h2>Edit Request</h2>
-      <input type="hidden" id="adminEditId">
+  <!-- Cart Review Modal -->
+  <div class="modal-overlay" id="reviewModal">
+    <div class="modal-box" style="width: 700px; max-width: 95%;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
+        <h2 id="modalCartTitle">Cart Review</h2>
+        <button onclick="closeReviewModal()" class="btn-cancel" style="padding: 4px 10px;">✕ Close</button>
+      </div>
+      
+      <div id="modalStudentInfo" style="background: #f8fafc; padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 14px;">
+        <!-- Student details injected here -->
+      </div>
 
-      <label>Component</label>
-      <input id="adminEditComponent" readonly style="background:#f1f5f9; font-weight:600;">
+      <div style="max-height: 400px; overflow-y: auto;">
+        <table width="100%" class="data-table" style="border-collapse: collapse;">
+          <thead>
+            <tr style="text-align: left; border-bottom: 2px solid #e2e8f0;">
+              <th style="padding: 10px;">Component</th>
+              <th style="padding: 10px; text-align: center;">Requested</th>
+              <th style="padding: 10px; text-align: center;">Available</th>
+              <th style="padding: 10px; text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody id="cartItemsTable">
+            <!-- Items injected here -->
+          </tbody>
+        </table>
+      </div>
 
-      <label>Quantity</label>
-      <input id="adminEditQuantity" type="number" min="1">
-
-      <label>Purpose / Note</label>
-      <textarea id="adminEditNote" rows="3" style="resize:vertical;"></textarea>
-
-      <label>Status Override</label>
-      <select id="adminEditStatus">
-        <option value="">— Keep current —</option>
-        <option value="PENDING">PENDING</option>
-        <option value="APPROVED">APPROVED</option>
-        <option value="REJECTED">REJECTED</option>
-        <option value="WITHDRAWN">WITHDRAWN</option>
-        <option value="CONFIRMED">CONFIRMED</option>
-        <option value="COMPLETED">COMPLETED</option>
-      </select>
-
-      <div class="modal-actions">
-        <button class="btn-cancel" onclick="closeAdminEditModal()">Cancel</button>
-        <button onclick="saveAdminEdit()">Save Changes</button>
+      <div style="margin-top: 25px; display: flex; justify-content: space-between; align-items: flex-end; gap: 15px;">
+        <div style="flex-grow: 1;">
+          <label style="font-size: 13px; font-weight: 600; color: #475569;">Rejection Note (for all rejected items)</label>
+          <input type="text" id="mainNote" placeholder="e.g. Broken or out of stock" style="width: 100%; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; margin-top: 5px;">
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button onclick="processCart('REJECT')" style="background: #ef4444; color: white;">Reject All</button>
+          <button onclick="processCart(null)" style="background: #334155; color: white;">Process Selections</button>
+          <button onclick="processCart('APPROVE')" style="background: #16a34a; color: white; padding: 12px 20px;">Approve All</button>
+        </div>
       </div>
     </div>
   </div>
@@ -106,7 +89,9 @@
   <div id="toast"></div>
 
   <script>
-    let currentFilter = 'ALL';
+    let currentCartId = null;
+    let currentItems = [];
+    let currentStudentInfo = {}; // To store student info for the modal
 
     function toggleMenu() {
       document.getElementById("sidebar").classList.toggle("active");
@@ -125,163 +110,170 @@
       window.location.href = "/login.html";
     }
 
-    function statusBadge(status) {
-      const colors = {
-        PENDING: 'background:#f59e0b;color:#fff',
-        APPROVED: 'background:#16a34a;color:#fff',
-        REJECTED: 'background:#dc2626;color:#fff',
-        WITHDRAWN: 'background:#64748b;color:#fff',
-        CONFIRMED: 'background:#0891b2;color:#fff',
-        COMPLETED: 'background:#334155;color:#fff',
-        EXPIRED: 'background:#94a3b8;color:#fff'
-      };
-      return `<span class="badge" style="${colors[status] || 'background:#e2e8f0;color:#334155'}">${status}</span>`;
-    }
-
-    async function loadRequests(filter) {
-      if (filter) currentFilter = filter;
+    async function loadQueue() {
       try {
-        const res = await fetch(`/api/admin/requests?status=${currentFilter}`, { credentials: "same-origin" });
-        if (res.status === 401) { window.location.href = "/login.html"; return; }
-        const requests = await res.json();
-        renderRequests(requests);
-      } catch (err) {
-        console.error("Load requests error:", err);
+        const res = await fetch("/api/admin/request-queue", { credentials: "same-origin" });
+        if (!res.ok) {
+           if (res.status === 401) { window.location.href = "/login.html"; return; }
+           throw new Error(`Server error: ${res.status}`);
+        }
+        const queue = await res.json();
+        if (!Array.isArray(queue)) throw new Error("Invalid response format");
+        renderQueue(queue);
+      } catch (e) { 
+        console.error(e); 
+        showToast(e.message || "Error loading queue", false); 
+        document.getElementById("queueContainer").innerHTML = `<div style="padding:20px; color:#ef4444; background:white; border-radius:8px;">${e.message}</div>`;
       }
     }
 
-    function renderRequests(requests) {
-      const container = document.getElementById("requestsList");
-
-      if (requests.length === 0) {
-        container.innerHTML = '<div class="card"><p style="color:#94a3b8;">No requests found</p></div>';
+    function renderQueue(queue) {
+      const container = document.getElementById("queueContainer");
+      const empty = document.getElementById("emptyState");
+      
+      if (queue.length === 0) {
+        container.innerHTML = "";
+        empty.style.display = "block";
         return;
       }
-
-      container.innerHTML = requests.map(r => {
-        const borderColor = { PENDING: '#f59e0b', APPROVED: '#16a34a', REJECTED: '#dc2626', WITHDRAWN: '#64748b', CONFIRMED: '#0891b2' }[r.status] || '#e2e8f0';
-        const isPending = r.status === 'PENDING';
-
-        return `
-          <div class="card" style="border-left: 4px solid ${borderColor};">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
-              <div>
-                <strong style="font-size:15px;">${r.component_name}</strong> × ${r.quantity}
-                ${statusBadge(r.status)}
-                <br>
-                <span style="font-size:13px; color:#334155;">👤 ${r.student_name}</span>
-                <code style="background:#f1f5f9; padding:2px 6px; border-radius:4px; font-size:12px; margin-left:6px;">${r.usn}</code>
-                ${r.email ? `<span style="font-size:12px; color:#64748b; margin-left:8px;">📧 ${r.email}</span>` : ''}
-              </div>
-              <span style="font-size:12px; color:#94a3b8;">${new Date(r.created_at).toLocaleString()}</span>
-            </div>
-            ${r.purpose_note ? `<p style="color:#64748b; font-size:13px; margin:8px 0 0;">📝 ${r.purpose_note}</p>` : ''}
-            ${r.rejection_reason ? `<p style="color:#dc2626; font-size:13px; margin:8px 0 0;">❌ ${r.rejection_reason}</p>` : ''}
-            ${r.confirmed_at ? `<p style="color:#0891b2; font-size:12px; margin:8px 0 0;">✅ Student confirmed: ${new Date(r.confirmed_at).toLocaleString()}</p>` : ''}
-
-            <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
-              ${isPending ? `
-                <button class="btn-sm" style="background:#16a34a;" onclick="approveRequest(${r.id})">✅ Approve</button>
-                <button class="btn-sm" style="background:#dc2626;" onclick="openRejectModal(${r.id})">❌ Reject</button>
-              ` : ''}
-              <button class="btn-sm btn-edit" onclick="openAdminEditModal(${r.id}, '${r.component_name.replace(/'/g, "\\'")}', ${r.quantity}, '${(r.purpose_note || '').replace(/'/g, "\\'")}', '${r.status}')">✏️ Edit</button>
-            </div>
+      
+      empty.style.display = "none";
+      container.innerHTML = queue.map(c => `
+        <div class="card" style="border-left: 5px solid #2563eb; cursor: pointer; transition: transform 0.2s;" onclick="openReviewModal('${c.cart_id}')">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <strong style="color: #1e293b; font-size: 16px;">${c.student_name}</strong>
+            <span class="badge badge-blue">${c.item_count} items</span>
           </div>
-        `;
-      }).join('');
+          <div style="color: #64748b; font-size: 13px; margin: 8px 0;">
+            <code style="background:#f1f5f9; padding:2px 5px; border-radius:4px;">${c.usn}</code>
+            <span style="margin-left: 10px; font-size: 11px;">🕒 ${new Date(c.request_timestamp).toLocaleString()}</span>
+          </div>
+          <p style="font-size: 13px; color: #475569; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.5;">
+            ${c.summary}
+          </p>
+          <div style="margin-top: 15px; text-align: right;">
+            <span style="color: #2563eb; font-weight: 600; font-size: 13px;">Review Cart →</span>
+          </div>
+        </div>
+      `).join('');
     }
 
-    // Approve
-    async function approveRequest(id) {
-      if (!confirm("Approve this request? This will create an issue record and decrement stock.")) return;
+    async function openReviewModal(cartId) {
+      currentCartId = cartId;
       try {
-        const res = await fetch(`/api/admin/requests/${id}/approve`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" }
+        const res = await fetch(`/api/admin/request-cart/${encodeURIComponent(cartId)}`, { credentials: "same-origin" });
+        if (!res.ok) {
+          if (res.status === 401) { window.location.href = "/login.html"; return; }
+          throw new Error(`Server error: ${res.status}`);
+        }
+        const cartDetails = await res.json();
+        currentItems = cartDetails.items;
+        currentStudentInfo = cartDetails.student_info;
+        
+        // Initialize currentAction for all items
+        currentItems.forEach(item => {
+          item.currentAction = 'APPROVE';
         });
-        const data = await res.json();
-        showToast(data.message, data.success);
-        loadRequests();
-      } catch (err) {
-        showToast("Error approving request", false);
-      }
+
+        document.getElementById("modalCartTitle").innerText = `Review Cart for ${currentStudentInfo.name}`;
+        renderStudentInfo();
+        renderCartItems();
+        document.getElementById("mainNote").value = ""; // Clear rejection note
+        document.getElementById("reviewModal").classList.add("active");
+      } catch (e) { console.error(e); showToast(e.message || "Error loading cart", false); }
     }
 
-    // Reject
-    function openRejectModal(id) {
-      document.getElementById("rejectReqId").value = id;
-      document.getElementById("rejectReason").value = "";
-      document.getElementById("rejectModal").classList.add("active");
+    function renderStudentInfo() {
+      const infoDiv = document.getElementById("modalStudentInfo");
+      infoDiv.innerHTML = `
+        <strong>${currentStudentInfo.name}</strong>
+        <span style="margin-left: 10px; color: #475569;">${currentStudentInfo.usn}</span>
+        ${currentStudentInfo.email ? `<br><span style="color: #64748b;">📧 ${currentStudentInfo.email}</span>` : ''}
+        ${currentStudentInfo.phone ? `<span style="margin-left: 10px; color: #64748b;">📞 ${currentStudentInfo.phone}</span>` : ''}
+      `;
     }
 
-    function closeRejectModal() {
-      document.getElementById("rejectModal").classList.remove("active");
+    function renderCartItems() {
+      const tbody = document.getElementById("cartItemsTable");
+      tbody.innerHTML = currentItems.map((item, idx) => `
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+          <td style="padding: 12px;">
+            <strong style="display:block;">${item.component_name}</strong>
+            ${item.purpose_note ? `<small style="color:#64748b;">📝 ${item.purpose_note}</small>` : ''}
+          </td>
+          <td style="text-align: center; padding: 12px; font-weight: 700; color: #2563eb;">${item.quantity}</td>
+          <td style="text-align: center; padding: 12px; color: ${item.available_quantity < item.quantity ? '#ef4444' : '#059669'}; font-weight: 600;">
+            ${item.available_quantity}
+          </td>
+          <td style="text-align: right; padding: 12px;">
+            <select onchange="updateItemAction(${idx}, this.value)" style="padding: 4px; border-radius: 4px; border: 1px solid #e2e8f0; font-size: 11px;">
+              <option value="APPROVE" ${item.currentAction === 'APPROVE' ? 'selected' : ''}>Approve</option>
+              <option value="REJECT" ${item.currentAction === 'REJECT' ? 'selected' : ''}>Reject</option>
+            </select>
+          </td>
+        </tr>
+      `).join('');
+      
+      // Initialize currentAction for all items if not already set (e.g., on first load)
+      currentItems.forEach(item => {
+        if (!item.currentAction) item.currentAction = 'APPROVE';
+      });
     }
 
-    document.getElementById("rejectModal").addEventListener("click", function (e) {
-      if (e.target === this) closeRejectModal();
-    });
+    function updateItemAction(idx, action) {
+      currentItems[idx].currentAction = action;
+    }
 
-    async function confirmReject() {
-      const id = document.getElementById("rejectReqId").value;
-      const reason = document.getElementById("rejectReason").value.trim();
+    function closeReviewModal() {
+      document.getElementById("reviewModal").classList.remove("active");
+    }
+
+    async function processCart(globalAction) {
+      const mainNote = document.getElementById("mainNote").value.trim();
+      
+      const itemsToProcess = currentItems.map(item => ({
+        id: item.id,
+        action: globalAction || item.currentAction, // Use globalAction if provided, else item-specific
+        note: mainNote // Apply mainNote to all items for simplicity, backend can handle specific notes if needed
+      }));
+
+      const actionVerb = globalAction === 'APPROVE' ? 'approve all' : globalAction === 'REJECT' ? 'reject all' : 'process current selections';
+      if (!confirm(`Confirm: ${actionVerb} for this cart?`)) return;
+      
+      const buttons = document.querySelectorAll('#reviewModal button');
+      buttons.forEach(btn => btn.disabled = true);
 
       try {
-        const res = await fetch(`/api/admin/requests/${id}/reject`, {
+        const res = await fetch("/api/admin/requests/bulk-action", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reason })
+          body: JSON.stringify({ cart_id: currentCartId, items: itemsToProcess, action: globalAction, main_note: mainNote })
         });
         const data = await res.json();
-        showToast(data.message, data.success);
-        closeRejectModal();
-        loadRequests();
-      } catch (err) {
-        showToast("Error rejecting request", false);
+        if (data.success) {
+          showToast(data.message);
+          closeReviewModal();
+          loadQueue();
+        } else {
+          showToast(data.message, false);
+        }
+      } catch (err) { 
+        showToast("Error processing cart", false); 
+      } finally {
+        buttons.forEach(btn => btn.disabled = false);
       }
     }
 
-    // Admin Edit
-    function openAdminEditModal(id, componentName, quantity, note, status) {
-      document.getElementById("adminEditId").value = id;
-      document.getElementById("adminEditComponent").value = componentName;
-      document.getElementById("adminEditQuantity").value = quantity;
-      document.getElementById("adminEditNote").value = note;
-      document.getElementById("adminEditStatus").value = "";
-      document.getElementById("adminEditModal").classList.add("active");
-    }
-
-    function closeAdminEditModal() {
-      document.getElementById("adminEditModal").classList.remove("active");
-    }
-
-    document.getElementById("adminEditModal").addEventListener("click", function (e) {
-      if (e.target === this) closeAdminEditModal();
-    });
-
-    async function saveAdminEdit() {
-      const id = document.getElementById("adminEditId").value;
-      const quantity = parseInt(document.getElementById("adminEditQuantity").value);
-      const purpose_note = document.getElementById("adminEditNote").value.trim();
-      const status = document.getElementById("adminEditStatus").value || undefined;
-
-      try {
-        const res = await fetch(`/api/admin/requests/${id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ quantity, purpose_note, status })
-        });
-        const data = await res.json();
-        showToast(data.message, data.success);
-        closeAdminEditModal();
-        loadRequests();
-      } catch (err) {
-        showToast("Error updating request", false);
-      }
-    }
-
-    window.onload = () => loadRequests('PENDING');
+    window.onload = loadQueue;
   </script>
+
+  <style>
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000; animation: fadeIn 0.3s forwards; }
+    .modal-overlay.active { display: flex; }
+    .modal-box { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .badge-blue { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; font-size: 11px; padding: 2px 8px; border-radius: 99px; }
+  </style>
 
   <script src="/dark-mode.js"></script>
 </body>
