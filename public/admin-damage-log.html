@@ -98,8 +98,6 @@
       setTimeout(() => toast.style.display = "none", 2500);
     }
 
-    function toggleMenu() { document.getElementById("sidebar").classList.toggle("active"); }
-    async function logout() { await fetch("/logout", { method: "POST" }); window.location.href = "/login.html"; }
 
     window.onload = loadReports;
   </script>

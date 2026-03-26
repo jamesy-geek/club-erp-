@@ -115,9 +115,6 @@
     let currentItems = [];
     let currentStudentInfo = {}; // To store student info for the modal
 
-    function toggleMenu() {
-      document.getElementById("sidebar").classList.toggle("active");
-    }
 
     function showToast(message, success = true) {
       const toast = document.getElementById("toast");
@@ -127,10 +124,6 @@
       setTimeout(() => toast.style.display = "none", 2500);
     }
 
-    async function logout() {
-      await fetch("/logout", { method: "POST" });
-      window.location.href = "/login.html";
-    }
 
     async function loadQueue() {
       try {

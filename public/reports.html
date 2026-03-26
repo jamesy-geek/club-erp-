@@ -42,9 +42,6 @@
 
   <script>
 
-    function toggleMenu() {
-      document.getElementById("sidebar").classList.toggle("active");
-    }
 
     function buildQuery() {
       const usn = document.getElementById("usnInput").value.trim();
@@ -68,10 +65,6 @@
       window.open("/download-report-pdf" + buildQuery(), "_blank");
     }
 
-    async function logout() {
-      await fetch("/logout", { method: "POST", credentials: "same-origin" });
-      window.location.href = "/login.html";
-    }
 
   </script>
 

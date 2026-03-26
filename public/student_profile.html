@@ -76,9 +76,6 @@
   <div id="toast"></div>
 
   <script>
-    function toggleMenu() {
-      document.getElementById("sidebar").classList.toggle("active");
-    }
 
     function showToast(message, success = true) {
       const toast = document.getElementById("toast");
@@ -176,10 +173,6 @@
       }
     }
 
-    async function logout() {
-      await fetch("/logout", { method: "POST" });
-      window.location.href = "/login.html";
-    }
 
     // Auto-load if USN in URL
     window.onload = () => {
