@@ -442,17 +442,20 @@ async function ensureDbInitialized() {
   return dbInitializationPromise;
 }
 
-// Middleware to ensure DB is ready before any route
 app.use(async (req, res, next) => {
   // Allow these paths without DB
   const staticPaths = ['/login.html', '/student-login.html', '/confirm-receipt.html', '/style.css', '/ennovate-logo.png', '/favicon.ico', '/debug-env', '/version'];
   if (staticPaths.includes(req.path)) return next();
 
   if (!dbReady) {
-    return res.status(503).json({
-      success: false,
-      message: "Database is still initializing. Please refresh in a few seconds."
-    });
+    try {
+      await ensureDbInitialized();
+    } catch (err) {
+      return res.status(503).json({
+        success: false,
+        message: "Database failed to initialize: " + err.message
+      });
+    }
   }
   next();
 });
