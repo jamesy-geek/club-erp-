@@ -7,31 +7,14 @@
   <link rel="stylesheet" href="/style.css">
   <script>if (localStorage.getItem("darkMode") == "true") document.documentElement.className = "dark"</script>
   <script src="/club-branding.js"></script>
+  <script src="/admin-sidebar.js"></script>
 </head>
 
 <body>
 
   <div class="menu-toggle" onclick="toggleMenu()">☰ Menu</div>
   <div class="layout">
-    <div class="sidebar" id="sidebar">
-      <h2><img src="/ennovate-logo.png" alt=""> CERP</h2>
-      <a href="/" id="nav-dashboard">Dashboard</a>
-      <a href="/components-page" id="nav-components">Components</a>
-      <a href="/transactions-page" id="nav-transactions">Transactions</a>
-      <a href="/reports-page" id="nav-reports">Reports</a>
-      <a href="/students-page" id="nav-students">Students</a>
-      <a href="/student_profile.html" id="nav-profile">Student Profile</a>
-      <a href="/admin-requests-page" id="nav-requests">Request Queue</a>
-      <a href="/admin-request-history.html" id="nav-logs">Request Logs</a>
-      <a href="/admin-damage-log.html" id="nav-damage">Damage Log</a>
-      <hr>
-      <a href="/admin-settings.html" id="nav-settings">Admin Settings</a>
-      <a href="#" onclick="logout()">Logout</a>
-      <div class="sidebar-footer">
-        <img src="/ennovate-logo.png" alt="">
-        <span>Built by Jishnu Abbhay D</span>
-      </div>
-    </div>
+    <div id="admin-sidebar-placeholder"></div>
 
     <div class="content">
       <h1>Request Queue</h1>
@@ -42,6 +25,32 @@
       </div>
       <div id="emptyState" style="display:none; text-align:center; padding: 40px; color: #94a3b8;">
         <p>No pending requests in the queue. ✅</p>
+      </div>
+
+      <hr style="margin: 40px 0; border: 0; border-top: 1px solid #e2e8f0;">
+
+      <h1>Processed Requests History</h1>
+      <p style="color:#64748b; margin-top:-16px; margin-bottom:20px; font-size:14px;">Review recently approved or rejected requests</p>
+      
+      <div class="card">
+        <div style="overflow-x:auto;">
+          <table width="100%">
+            <thead>
+              <tr style="text-align: left; border-bottom: 2px solid #e2e8f0;">
+                <th style="padding:10px;">Student</th>
+                <th style="padding:10px;">Component</th>
+                <th style="padding:10px; text-align:center;">Qty</th>
+                <th style="padding:10px;">Status</th>
+                <th style="padding:10px;">Processed By</th>
+                <th style="padding:10px;">Date</th>
+                <th style="padding:10px; text-align:right;">Log</th>
+              </tr>
+            </thead>
+            <tbody id="historyTable">
+              <tr><td colspan="7" style="text-align:center; padding:40px; color:#94a3b8;">Loading history...</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -88,6 +97,17 @@
     </div>
   </div>
 
+  <!-- Log Modal -->
+  <div id="logModal" class="modal-overlay">
+    <div class="modal-box" style="max-width: 600px;">
+      <h2>Audit Log</h2>
+      <div id="logContent" style="background:#f8fafc; padding:15px; border-radius:8px; font-family:'JetBrains Mono', monospace; font-size:12px; max-height: 400px; overflow-y: auto; white-space: pre-wrap;"></div>
+      <div style="margin-top: 20px; text-align: right;">
+        <button class="btn-cancel" onclick="closeLogModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast"></div>
 
   <script>
@@ -122,6 +142,7 @@
         const queue = await res.json();
         if (!Array.isArray(queue)) throw new Error("Invalid response format");
         renderQueue(queue);
+        loadHistory(); // Also load history
       } catch (e) { 
         console.error(e); 
         showToast(e.message || "Error loading queue", false); 
@@ -264,6 +285,69 @@
       } finally {
         buttons.forEach(btn => btn.disabled = false);
       }
+    }
+
+    async function loadHistory() {
+      try {
+        const res = await fetch("/api/admin/request-history");
+        if (res.status === 401) { window.location.href = "/login.html"; return; }
+        const data = await res.json();
+        renderHistoryTable(data);
+      } catch (e) { showToast("Error loading logs", false); }
+    }
+
+    function renderHistoryTable(rows) {
+      const tbody = document.getElementById("historyTable");
+      if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:40px; color:#94a3b8;">No historical requests found.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rows.map(r => `
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+          <td style="padding:10px;">
+            <strong>${r.student_name}</strong><br>
+            <small style="color:#64748b;">${r.usn}</small>
+          </td>
+          <td style="padding:10px;">${r.component_name}</td>
+          <td style="padding:10px; text-align:center;">${r.quantity}</td>
+          <td style="padding:10px;"><span class="badge ${getBadgeClass(r.status)}">${r.status}</span></td>
+          <td style="padding:10px;">${r.admin_name || 'System'}</td>
+          <td style="padding:10px;"><small style="color:#64748b;">${new Date(r.updated_at).toLocaleString()}</small></td>
+          <td style="padding:10px; text-align:right;">
+            <button class="btn-sm" style="background:#334155; color:white; padding:4px 8px; border:0; border-radius:4px; font-size:11px; cursor:pointer;" onclick='showLog(${JSON.stringify(r.edit_log)})'>View</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function getBadgeClass(s) {
+      if (s === 'APPROVED') return 'badge-green';
+      if (s === 'REJECTED') return 'badge-red';
+      if (s === 'WITHDRAWN') return 'badge-gray';
+      return '';
+    }
+
+    function showLog(logStr) {
+      let log = [];
+      try { log = typeof logStr === 'string' ? JSON.parse(logStr || '[]') : (logStr || []); } catch(e) { console.error("Log parse failed", e); }
+      
+      const content = document.getElementById("logContent");
+      if (log.length === 0) {
+        content.textContent = "No edit history available for this request.";
+      } else {
+        content.innerHTML = log.map(entry => `
+          <div style="margin-bottom:10px; border-bottom:1px solid #e2e8f0; padding-bottom:8px;">
+            <div style="color:#2563eb; font-weight:bold;">${entry.date} - ${entry.admin}</div>
+            <div style="color:#64748b; margin-top:4px;">${entry.action}: ${entry.details}</div>
+          </div>
+        `).join('');
+      }
+      document.getElementById("logModal").classList.add("active");
+    }
+
+    function closeLogModal() {
+      document.getElementById("logModal").classList.remove("active");
     }
 
     window.onload = loadQueue;

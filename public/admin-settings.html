@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/style.css">
   <script>if (localStorage.getItem("darkMode") == "true") document.documentElement.className = "dark"</script>
   <script src="/club-branding.js"></script>
+  <script src="/admin-sidebar.js"></script>
 </head>
 
 <body>
@@ -15,30 +16,8 @@
 
   <div class="layout">
 
-    <!-- SIDEBAR -->
-    <div class="sidebar" id="sidebar">
-      <h2><img src="/ennovate-logo.png" alt=""> CERP</h2>
-      <a href="/" id="nav-dashboard">Dashboard</a>
-      <a href="/components-page" id="nav-components">Components</a>
-      <a href="/transactions-page" id="nav-transactions">Transactions</a>
+    <!-- SIDEBAR -->    <div id="admin-sidebar-placeholder"></div>
 
-      <a href="/reports-page" id="nav-reports">Reports</a>
-      <a href="/students-page" id="nav-students">Students</a>
-      <a href="/student_profile.html" id="nav-profile">Student Profile</a>
-      <a href="/admin-requests-page" id="nav-requests">Request Queue</a>
-      <a href="/admin-request-history.html" id="nav-logs">Request Logs</a>
-      <a href="/admin-damage-log.html" id="nav-damage">Damage Log</a>
-
-      <hr>
-
-      <a href="/admin-settings.html" id="nav-settings" class="active">Admin Settings</a>
-      <a href="#" onclick="logout()">Logout</a>
-
-      <div class="sidebar-footer">
-        <img src="/ennovate-logo.png" alt="">
-        <span>Built by Jishnu Abbhay D</span>
-      </div>
-    </div>
 
     <!-- CONTENT -->
     <div class="content">
