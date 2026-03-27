@@ -562,7 +562,7 @@ app.post("/logout", (req, res) => {
   });
 });
 
-app.post("/change-admin", requireAdmin, async (req, res) => {
+app.post("/change-admin", requireAccess, async (req, res) => {
   const { newUsername, newPassword } = req.body;
   if (!newUsername || !newPassword) return res.json({ success: false, message: "Missing fields" });
   try {
@@ -583,7 +583,7 @@ app.post("/change-admin", requireAdmin, async (req, res) => {
   }
 });
 
-app.get("/api/admin/me", requireAdmin, (req, res) => {
+app.get("/api/admin/me", requireAccess, (req, res) => {
   res.json({ id: req.session.admin, role: req.session.role });
 });
 
@@ -748,7 +748,7 @@ app.post("/api/admin/requests/bulk-action", requireAccess, async (req, res) => {
 
 // ================= ADMIN MANAGEMENT =================
 
-app.post("/create-admin", requireAdmin, async (req, res) => {
+app.post("/create-admin", requireAccess, async (req, res) => {
   const { newUsername, newPassword, role } = req.body;
   if (!newUsername || !newPassword) return res.json({ success: false, message: "Missing fields" });
   console.log(`[ADMIN] Creating new admin: ${newUsername} with role ${role}`);
@@ -766,7 +766,7 @@ app.post("/create-admin", requireAdmin, async (req, res) => {
   }
 });
 
-app.post("/update-admin", requireAdmin, async (req, res) => {
+app.post("/update-admin", requireAccess, async (req, res) => {
   const { id, newUsername, newPassword, role } = req.body;
   if (!id) return res.json({ success: false, message: "Admin ID required" });
   console.log(`[ADMIN] Updating admin ID: ${id}`);
@@ -804,12 +804,12 @@ app.post("/update-admin", requireAdmin, async (req, res) => {
   }
 });
 
-app.get("/admins", requireAdmin, async (req, res) => {
+app.get("/admins", requireAccess, async (req, res) => {
   const result = await db.execute("SELECT id, username, role FROM admins");
   res.json(result.rows);
 });
 
-app.post("/delete-admin", requireAdmin, async (req, res) => {
+app.post("/delete-admin", requireAccess, async (req, res) => {
   const { id } = req.body;
   console.log(`[ADMIN] Deletion attempt for Admin ID: ${id} by Session Admin: ${req.session.admin}`);
   if (id === req.session.admin) return res.json({ success: false, message: "Cannot delete yourself" });
@@ -840,26 +840,26 @@ function safeSendFile(res, filePath) {
   });
 }
 
-app.get("/", requireAdmin, (req, res) => {
+app.get("/", requireAccess, (req, res) => {
   safeSendFile(res, path.join(__dirname, "public", "dashboard.html"));
 });
 
-app.get("/components-page", requireAdmin, (req, res) => {
+app.get("/components-page", requireAccess, (req, res) => {
   safeSendFile(res, path.join(__dirname, "public", "components.html"));
 });
 
 // Issue page removed — all issuing now goes through student request → admin approve flow
 
 
-app.get("/transactions-page", requireAdmin, (req, res) => {
+app.get("/transactions-page", requireAccess, (req, res) => {
   safeSendFile(res, path.join(__dirname, "public", "transactions.html"));
 });
 
-app.get("/reports-page", requireAdmin, (req, res) => {
+app.get("/reports-page", requireAccess, (req, res) => {
   safeSendFile(res, path.join(__dirname, "public", "reports.html"));
 });
 
-app.get("/students-page", requireAdmin, (req, res) => {
+app.get("/students-page", requireAccess, (req, res) => {
   safeSendFile(res, path.join(__dirname, "public", "students.html"));
 });
 
@@ -867,7 +867,7 @@ app.get("/student_profile.html", (req, res) => {
   safeSendFile(res, path.join(__dirname, "public", "student_profile.html"));
 });
 
-app.get("/admin-requests-page", requireAdmin, (req, res) => {
+app.get("/admin-requests-page", requireAccess, (req, res) => {
   safeSendFile(res, path.join(__dirname, "public", "admin-requests.html"));
 });
 
@@ -923,12 +923,12 @@ app.post("/edit-component", requireAccess, async (req, res) => {
   }
 });
 
-app.get("/components", requireAdmin, async (req, res) => {
+app.get("/components", requireAccess, async (req, res) => {
   const result = await db.execute("SELECT * FROM components");
   res.json(result.rows);
 });
 
-app.post("/delete-component", requireAdmin, async (req, res) => {
+app.post("/delete-component", requireAccess, async (req, res) => {
   const { id } = req.body;
   try {
     const active = await db.execute({ sql: "SELECT COUNT(*) AS active FROM issue_items WHERE component_id = ? AND (quantity - returned_quantity) > 0", args: [id] });
@@ -940,7 +940,7 @@ app.post("/delete-component", requireAdmin, async (req, res) => {
   }
 });
 
-app.post("/rename-component", requireAdmin, async (req, res) => {
+app.post("/rename-component", requireAccess, async (req, res) => {
   const { id, new_name } = req.body;
   await db.execute({ sql: "UPDATE components SET name = ? WHERE id = ?", args: [new_name, id] });
   res.json({ message: "Renamed successfully" });
@@ -948,7 +948,7 @@ app.post("/rename-component", requireAdmin, async (req, res) => {
 
 // ================= ISSUE CREATION =================
 
-app.post("/create-issue", requireAdmin, async (req, res) => {
+app.post("/create-issue", requireAccess, async (req, res) => {
   const { student_name, usn: rawUsn, phone, items } = req.body;
   const usn = (rawUsn || '').toUpperCase();
   if (!items || items.length === 0) return res.json({ message: "No items provided" });
@@ -1158,7 +1158,7 @@ app.post("/api/admin/damage-report-resolve", requireAccess, async (req, res) => 
 
 // ================= TRANSACTIONS =================
 
-app.get("/transactions", requireAdmin, async (req, res) => {
+app.get("/transactions", requireAccess, async (req, res) => {
   const result = await db.execute(`
     SELECT 
       issues.id AS issue_id,
@@ -1186,7 +1186,7 @@ app.get("/transactions", requireAdmin, async (req, res) => {
   res.json(result.rows);
 });
 
-app.post("/delete-transaction", requireAdmin, async (req, res) => {
+app.post("/delete-transaction", requireAccess, async (req, res) => {
   const { issue_id } = req.body;
   try {
     const items = await db.execute({ sql: "SELECT component_id, quantity, returned_quantity FROM issue_items WHERE issue_id = ?", args: [issue_id] });
@@ -1256,7 +1256,7 @@ app.get("/student/:usn", async (req, res) => {
 
 // ================= STUDENTS DIRECTORY =================
 
-app.get("/students", requireAdmin, async (req, res) => {
+app.get("/students", requireAccess, async (req, res) => {
   const result = await db.execute("SELECT * FROM students ORDER BY student_name ASC");
   // Force USN uppercase in output
   const rows = result.rows.map(r => ({ ...r, usn: (r.usn || '').toUpperCase() }));
@@ -1293,7 +1293,7 @@ app.post("/delete-student", requireAccess, async (req, res) => {
 
 // ================= DASHBOARD SUMMARY =================
 
-app.get("/dashboard-summary", requireAdmin, async (req, res) => {
+app.get("/dashboard-summary", requireAccess, async (req, res) => {
   try {
     const settings = await getSettings();
     const threshold = parseInt(settings.low_stock_threshold || '5');
@@ -1322,7 +1322,7 @@ app.get("/dashboard-summary", requireAdmin, async (req, res) => {
 
 // ================= DATABASE EXPORT (JSON Backup) =================
 
-app.get("/export-database", requireAdmin, async (req, res) => {
+app.get("/export-database", requireAccess, async (req, res) => {
   try {
     const admins = await db.execute("SELECT id, username FROM admins");
     const components = await db.execute("SELECT * FROM components");
@@ -1360,7 +1360,7 @@ app.get("/export-database", requireAdmin, async (req, res) => {
 
 // ================= PDF DATABASE BACKUP =================
 
-app.get("/export-database-pdf", requireAdmin, async (req, res) => {
+app.get("/export-database-pdf", requireAccess, async (req, res) => {
   try {
     const components = await db.execute("SELECT * FROM components");
     const students = await db.execute("SELECT * FROM students");
@@ -1471,7 +1471,7 @@ app.get("/export-database-pdf", requireAdmin, async (req, res) => {
 
 // ================= BULK COMPONENT IMPORT (Excel & PDF) =================
 
-app.post("/import-components", requireAdmin, upload.single("file"), async (req, res) => {
+app.post("/import-components", requireAccess, upload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.json({ success: false, message: "No file uploaded" });
 
@@ -2062,7 +2062,7 @@ app.post("/api/student/request/:id/withdraw", requireStudent, async (req, res) =
 // ================= ADMIN REQUEST QUEUE API =================
 
 // Get all requests (admin)
-app.get("/api/admin/requests", requireAdmin, async (req, res) => {
+app.get("/api/admin/requests", requireAccess, async (req, res) => {
   try {
     const statusFilter = req.query.status;
     let sql = `SELECT cr.*, c.name AS component_name, c.available_quantity,
@@ -2085,7 +2085,7 @@ app.get("/api/admin/requests", requireAdmin, async (req, res) => {
 });
 
 // Approve a request (admin)
-app.post("/api/admin/requests/:id/approve", requireAdmin, async (req, res) => {
+app.post("/api/admin/requests/:id/approve", requireAccess, async (req, res) => {
   try {
     const reqRow = await db.execute({ sql: "SELECT cr.*, c.name AS component_name, c.available_quantity, s.student_name, s.email FROM component_requests cr JOIN components c ON cr.component_id = c.id JOIN students s ON cr.student_id = s.id WHERE cr.id = ?", args: [req.params.id] });
     if (reqRow.rows.length === 0) return res.json({ success: false, message: "Request not found" });
@@ -2118,7 +2118,7 @@ app.post("/api/admin/requests/:id/approve", requireAdmin, async (req, res) => {
 });
 
 // Reject a request (admin)
-app.post("/api/admin/requests/:id/reject", requireAdmin, async (req, res) => {
+app.post("/api/admin/requests/:id/reject", requireAccess, async (req, res) => {
   const { reason } = req.body;
   try {
     const reqRow = await db.execute({ sql: "SELECT cr.*, c.name AS component_name, s.student_name, s.email FROM component_requests cr JOIN components c ON cr.component_id = c.id JOIN students s ON cr.student_id = s.id WHERE cr.id = ?", args: [req.params.id] });
@@ -2137,7 +2137,7 @@ app.post("/api/admin/requests/:id/reject", requireAdmin, async (req, res) => {
 });
 
 // Admin edit a request
-app.put("/api/admin/requests/:id", requireAdmin, async (req, res) => {
+app.put("/api/admin/requests/:id", requireAccess, async (req, res) => {
   const { component_id, quantity, purpose_note, status } = req.body;
   try {
     const reqRow = await db.execute({ sql: "SELECT * FROM component_requests WHERE id = ?", args: [req.params.id] });
@@ -2162,7 +2162,7 @@ app.put("/api/admin/requests/:id", requireAdmin, async (req, res) => {
 });
 
 // Create student account (admin)
-app.post("/api/admin/create-student-account", requireAdmin, async (req, res) => {
+app.post("/api/admin/create-student-account", requireAccess, async (req, res) => {
   const { student_name, usn, phone, email, password } = req.body;
   if (!student_name || !usn || !email || !password) return res.json({ success: false, message: "Name, USN, email, and password are required" });
   try {
@@ -2208,7 +2208,7 @@ app.get("/api/confirm-receipt", async (req, res) => {
 
 // ================= ADMIN DASHBOARD SUMMARY (updated) =================
 
-app.get("/pending-requests-count", requireAdmin, async (req, res) => {
+app.get("/pending-requests-count", requireAccess, async (req, res) => {
   try {
     const result = await db.execute("SELECT COUNT(*) AS count FROM component_requests WHERE status = 'PENDING'");
     res.json({ count: result.rows[0].count || 0 });
@@ -2219,7 +2219,7 @@ app.get("/pending-requests-count", requireAdmin, async (req, res) => {
 
 // ================= BULK IMPORT STUDENTS =================
 
-app.get("/api/admin/student-import-template", requireAdmin, async (req, res) => {
+app.get("/api/admin/student-import-template", requireAccess, async (req, res) => {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Students");
   sheet.columns = [
@@ -2237,7 +2237,7 @@ app.get("/api/admin/student-import-template", requireAdmin, async (req, res) => 
   res.end();
 });
 
-app.post("/api/admin/bulk-import-students", requireAdmin, upload.single("file"), async (req, res) => {
+app.post("/api/admin/bulk-import-students", requireAccess, upload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.json({ success: false, message: "No file uploaded" });
 
@@ -2322,7 +2322,7 @@ app.post("/api/admin/bulk-import-students", requireAdmin, upload.single("file"),
 
 // ================= GRADUATED STUDENT CLEANUP =================
 
-app.post("/api/admin/cleanup-graduated", requireAdmin, async (req, res) => {
+app.post("/api/admin/cleanup-graduated", requireAccess, async (req, res) => {
   try {
     // Find students who have NO unreturned items
     const graduatedStudents = await db.execute(`
@@ -2430,14 +2430,14 @@ setTimeout(async () => {
 */
 
 // Manual backup trigger
-app.post("/api/admin/create-backup", requireAdmin, async (req, res) => {
+app.post("/api/admin/create-backup", requireAccess, async (req, res) => {
   const now = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
   const success = await createBackup(`manual_${now}`);
   res.json({ success, message: success ? "Backup created successfully" : "Failed to create backup" });
 });
 
 // List backups
-app.get("/api/admin/backups", requireAdmin, async (req, res) => {
+app.get("/api/admin/backups", requireAccess, async (req, res) => {
   try {
     const result = await db.execute("SELECT id, name, created_at, LENGTH(data) as size_bytes FROM backups ORDER BY created_at DESC");
     res.json({ success: true, backups: result.rows });
@@ -2447,7 +2447,7 @@ app.get("/api/admin/backups", requireAdmin, async (req, res) => {
 });
 
 // Download specific backup
-app.get("/api/admin/backup/:id", requireAdmin, async (req, res) => {
+app.get("/api/admin/backup/:id", requireAccess, async (req, res) => {
   try {
     const result = await db.execute({ sql: "SELECT * FROM backups WHERE id = ?", args: [req.params.id] });
     if (result.rows.length === 0) return res.status(404).json({ message: "Backup not found" });
@@ -2461,7 +2461,7 @@ app.get("/api/admin/backup/:id", requireAdmin, async (req, res) => {
 });
 
 // Restore from backup
-app.post("/api/admin/restore-backup", requireAdmin, upload.single("file"), async (req, res) => {
+app.post("/api/admin/restore-backup", requireAccess, upload.single("file"), async (req, res) => {
   try {
     let backupData;
     if (req.file) {

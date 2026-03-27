@@ -14,14 +14,14 @@ const sidebarLinks = [
   { id: 'nav-damage', label: 'Damage Log', href: '/admin-damage-log.html', icon: '⚠️' }
 ];
 
-const restrictedForSubAdmin = ['nav-settings', 'nav-students', 'nav-components', 'nav-profile'];
+const restrictedForSubAdmin = ['nav-settings', 'nav-students', 'nav-components'];
 
 async function initSidebar() {
   const container = document.getElementById("admin-sidebar-placeholder");
   if (!container) return;
 
   try {
-    const res = await fetch("/api/admin/me");
+    const res = await fetch("/api/admin/me?v=1.4");
     if (!res.ok) throw new Error("Not logged in");
     const me = await res.json();
 
