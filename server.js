@@ -1656,6 +1656,57 @@ app.get("/download-report-pdf", requireAccess, async (req, res) => {
     doc.fillColor("#000000");
   }
 
+  // Damage Reports Section
+  doc.addPage();
+  doc.moveDown(1.5);
+  doc.rect(40, doc.y, 4, 16).fill("#dc2626");
+  doc.fill("#1e293b").fontSize(13).font("Helvetica-Bold").text("  Damage Reports Log", 46, doc.y + 1);
+  doc.fill("#000000"); doc.moveDown(0.8);
+
+  let dmgQuery = `
+    SELECT dr.*, c.name as component_name, s.student_name, s.usn, a.username as admin_name
+    FROM damage_reports dr
+    JOIN components c ON dr.component_id = c.id
+    JOIN students s ON dr.student_id = s.id
+    LEFT JOIN admins a ON dr.admin_id = a.id
+  `;
+  let dmgConditions = [];
+  let dmgParams = [];
+  if (usn) {
+    const usnArray = usn.split(",");
+    dmgConditions.push(`s.usn IN (${usnArray.map(() => "?").join(",")})`);
+    dmgParams.push(...usnArray);
+  }
+  if (startDate) { dmgConditions.push("date(dr.reported_at) >= ?"); dmgParams.push(startDate); }
+  if (endDate) { dmgConditions.push("date(dr.reported_at) <= ?"); dmgParams.push(endDate); }
+  
+  if (dmgConditions.length > 0) dmgQuery += " WHERE " + dmgConditions.join(" AND ");
+  dmgQuery += " ORDER BY dr.reported_at DESC";
+
+  const dmgResult = await db.execute({ sql: dmgQuery, args: dmgParams });
+  const dmgRows = dmgResult.rows;
+
+  if (dmgRows.length > 0) {
+    await doc.table({
+      headers: [
+        { label: "Date", width: 75, headerColor: "#dc2626", headerOpacity: 1 },
+        { label: "Student", width: 90, headerColor: "#dc2626", headerOpacity: 1 },
+        { label: "USN", width: 75, headerColor: "#dc2626", headerOpacity: 1 },
+        { label: "Component", width: 90, headerColor: "#dc2626", headerOpacity: 1 },
+        { label: "Severity", width: 60, headerColor: "#dc2626", headerOpacity: 1, align: "center" },
+        { label: "Resolution Status", width: 100, headerColor: "#dc2626", headerOpacity: 1, align: "center" }
+      ],
+      rows: dmgRows.map(r => {
+        let timestamp = r.reported_at ? r.reported_at.split(" ")[0] : "N/A";
+        return [timestamp, r.student_name, r.usn, r.component_name, r.severity, r.status];
+      })
+    }, { prepareHeader: () => doc.font("Helvetica-Bold").fontSize(8).fillColor("#ffffff"), prepareRow: () => { doc.font("Helvetica").fontSize(7).fillColor("#334155"); return doc; }, padding: 4, columnsSize: [75, 90, 75, 90, 60, 100] });
+  } else {
+    doc.fontSize(10).fillColor("#94a3b8").text("  No damage reports match the specified filters.");
+    doc.fillColor("#000000");
+  }
+
+
   // Footer
   doc.moveDown(2);
   doc.fontSize(9).fillColor("#1e293b").font("Helvetica-Bold")

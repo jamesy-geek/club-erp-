@@ -47,13 +47,18 @@
       }
       
       empty.style.display = "none";
-      container.innerHTML = reports.map(r => `
+      container.innerHTML = reports.map(r => {
+        const isPending = r.status === 'PENDING';
+        const statusText = isPending ? 'PENDING' : r.status;
+        const statusColor = isPending ? '#94a3b8' : '#16a34a';
+
+        return `
         <div class="card" style="border-left: 5px solid ${r.severity === 'DESTROYED' ? '#ef4444' : r.severity === 'MAJOR' ? '#f59e0b' : '#3b82f6'};">
           <div style="display:flex; justify-content:space-between; align-items:flex-start;">
             <div>
               <strong style="font-size: 16px;">${r.component_name} ${r.quantity > 1 ? `(x${r.quantity})` : ''}</strong>
               <span class="badge" style="margin-left:8px; background:${getSeverityColor(r.severity)}; color:white; font-size:10px;">${r.severity}</span>
-              ${r.status === 'RESOLVED' ? '<span class="badge" style="background:#16a34a; color:white; margin-left:5px;">RESOLVED</span>' : ''}
+              <span class="badge" style="background:${statusColor}; color:white; margin-left:5px;">${statusText}</span>
               <br>
               <span style="font-size:13px; color:#64748b;">👤 ${r.student_name} (${r.usn})</span>
             </div>
@@ -63,20 +68,33 @@
             📝 <strong>Admin Note:</strong> ${r.note || 'No description provided'}
           </p>
           <div style="display:flex; justify-content:flex-end; gap:8px;">
-            ${r.status === 'PENDING' ? `
-              <button class="btn-sm" style="background:#2563eb;" onclick="resolveReport(${r.id}, 'RESOLVED')">Mark as RESOLVED</button>
+            ${isPending ? `
+              <div style="display:flex; gap:8px; align-items:center;">
+                <select id="resolve-type-${r.id}" style="padding: 6px; border-radius: 4px; border: 1px solid #cbd5e1; font-size:12px; background:white;">
+                  <option value="Item replaced">Item replaced</option>
+                  <option value="Fine Paid">Fine Paid</option>
+                  <option value="Resolved without fine">Resolved without fine</option>
+                </select>
+                <button class="btn-sm" style="background:#2563eb;" onclick="submitResolve(${r.id})">Mark Resolved</button>
+              </div>
             ` : `
               <button class="btn-sm" style="background:#64748b;" onclick="resolveReport(${r.id}, 'PENDING')">Re-open</button>
             `}
           </div>
         </div>
-      `).join('');
+      `;
+      }).join('');
     }
 
     function getSeverityColor(s) {
       if (s === 'DESTROYED') return '#ef4444';
       if (s === 'MAJOR') return '#f59e0b';
       return '#3b82f6';
+    }
+
+    async function submitResolve(id) {
+      const type = document.getElementById(`resolve-type-${id}`).value;
+      await resolveReport(id, type);
     }
 
     async function resolveReport(id, status) {

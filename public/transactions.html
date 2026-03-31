@@ -24,10 +24,14 @@
     <div class="content">
       <h1>Transactions</h1>
 
-      <div style="margin-bottom: 16px;">
-        <button onclick="setFilter('all')" id="filterAll">All</button>
-        <button onclick="setFilter('active')" id="filterActive" class="btn-edit">Active</button>
-        <button onclick="setFilter('completed')" id="filterCompleted" style="background:#334155;">Completed</button>
+      <div style="margin-bottom: 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <button onclick="setFilter('active')" id="filterActive" class="btn-edit">Active Transactions</button>
+        <button onclick="setFilter('completed')" id="filterCompleted" style="background:#334155;">Completed Transactions</button>
+        
+        <select id="sortOrder" onchange="setSort(this.value)" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: white; font-weight: 500; cursor: pointer;">
+          <option value="desc">Sort: New to Old</option>
+          <option value="asc">Sort: Old to New</option>
+        </select>
       </div>
 
       <div id="container"></div>
@@ -36,10 +40,25 @@
 
     <script>
 
-      let currentFilter = "all";
+      let currentFilter = "active";
+      let currentSort = "desc";
 
       function setFilter(type) {
         currentFilter = type;
+        
+        // Update button styles
+        document.getElementById("filterActive").style.opacity = type === 'active' ? '1' : '0.6';
+        document.getElementById("filterActive").className = type === 'active' ? 'btn-edit' : '';
+        document.getElementById("filterActive").style.background = type === 'active' ? '' : '#94a3b8';
+        
+        document.getElementById("filterCompleted").style.opacity = type === 'completed' ? '1' : '0.6';
+        document.getElementById("filterCompleted").style.background = type === 'completed' ? '#334155' : '#94a3b8';
+
+        load();
+      }
+
+      function setSort(order) {
+        currentSort = order;
         load();
       }
 
@@ -71,9 +90,16 @@
           grouped[row.issue_id].items.push(row);
         });
 
-        Object.keys(grouped).forEach(issue_id => {
+        const sortedGroups = Object.keys(grouped).map(id => ({ issue_id: id, ...grouped[id] }));
 
-          const issue = grouped[issue_id];
+        sortedGroups.sort((a, b) => {
+          const timeA = new Date(a.issue_timestamp).getTime();
+          const timeB = new Date(b.issue_timestamp).getTime();
+          return currentSort === "desc" ? timeB - timeA : timeA - timeB;
+        });
+
+        sortedGroups.forEach(issue => {
+          const issue_id = issue.issue_id;
           const localTime = new Date(issue.issue_timestamp).toLocaleString();
 
           const hasActive = issue.items.some(i => i.remaining > 0);
